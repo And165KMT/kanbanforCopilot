@@ -20,6 +20,7 @@
   "activationEvents": [
     "onView:kanbanto.boardView",
     "onCommand:kanbanto.openBoard",
+    "onCommand:kanbanto.openBoardFloating",
     "onStartupFinished"
   ],
   "main": "./dist/extension.js",
@@ -47,6 +48,10 @@
       {
         "command": "kanbanto.openBoard",
         "title": "Kanban: Open Task board"
+      },
+      {
+        "command": "kanbanto.openBoardFloating",
+        "title": "Kanban: Open Task board (Floating)"
       }
     ],
     "configuration": {

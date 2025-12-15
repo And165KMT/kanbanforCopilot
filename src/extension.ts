@@ -209,6 +209,13 @@ export function activate(context: vscode.ExtensionContext) {
       await vscode.commands.executeCommand('kanbanto.boardView.focus');
     })
   );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('kanbanto.openBoardFloating', async () => {
+      output.appendLine('command: kanbanto.openBoardFloating');
+      provider.openFloatingPanel();
+    })
+  );
 }
 
 class TaskBoardViewProvider implements vscode.WebviewViewProvider {
@@ -218,6 +225,8 @@ class TaskBoardViewProvider implements vscode.WebviewViewProvider {
   private static readonly fallbackEnvRelativePath = '.env';
 
   private view?: vscode.WebviewView;
+  private readonly webviews = new Set<vscode.Webview>();
+  private panel?: vscode.WebviewPanel;
   private store?: BoardStore;
   private board?: BoardFile;
   private watcher?: vscode.FileSystemWatcher;
@@ -238,6 +247,36 @@ class TaskBoardViewProvider implements vscode.WebviewViewProvider {
     private readonly output: vscode.OutputChannel
   ) {}
 
+  openFloatingPanel(): void {
+    if (this.panel) {
+      this.panel.reveal(vscode.ViewColumn.Active);
+      return;
+    }
+
+    const panel = vscode.window.createWebviewPanel(
+      'kanbanto.taskBoardPanel',
+      'Task board',
+      vscode.ViewColumn.Active,
+      {
+        enableScripts: true,
+        retainContextWhenHidden: true,
+        localResourceRoots: [
+          vscode.Uri.joinPath(this.context.extensionUri, 'media'),
+          vscode.Uri.joinPath(this.context.extensionUri, 'node_modules', '@vscode', 'webview-ui-toolkit', 'dist')
+        ]
+      }
+    );
+
+    this.panel = panel;
+    panel.webview.html = this.getHtml(panel.webview);
+    this.registerWebview(panel.webview, panel.onDidDispose(() => {
+      this.webviews.delete(panel.webview);
+      this.panel = undefined;
+    }));
+
+    void this.ensureStoreAndLoad();
+  }
+
   resolveWebviewView(view: vscode.WebviewView): void {
     this.view = view;
     this.output.appendLine('resolveWebviewView');
@@ -252,14 +291,10 @@ class TaskBoardViewProvider implements vscode.WebviewViewProvider {
 
     view.webview.html = this.getHtml(view.webview);
 
-    view.webview.onDidReceiveMessage(async (msg: WebviewToExtMessage) => {
-      try {
-        await this.onMessage(msg);
-      } catch (e) {
-        const message = e instanceof Error ? e.message : String(e);
-        void vscode.window.showErrorMessage(message);
-      }
-    });
+    this.registerWebview(view.webview, view.onDidDispose(() => {
+      this.webviews.delete(view.webview);
+      if (this.view === view) this.view = undefined;
+    }));
 
     // If the extension host starts with an empty window, ensure the view
     // updates when a folder is opened later (avoid staying in no-workspace state).
@@ -270,6 +305,21 @@ class TaskBoardViewProvider implements vscode.WebviewViewProvider {
     this.context.subscriptions.push(this.workspaceListener);
 
     void this.ensureStoreAndLoad();
+  }
+
+  private registerWebview(webview: vscode.Webview, disposeHook: vscode.Disposable): void {
+    this.webviews.add(webview);
+    this.context.subscriptions.push(disposeHook);
+
+    const sub = webview.onDidReceiveMessage(async (msg: WebviewToExtMessage) => {
+      try {
+        await this.onMessage(msg);
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        void vscode.window.showErrorMessage(message);
+      }
+    });
+    this.context.subscriptions.push(sub);
   }
 
   private async ensureStoreAndLoad(): Promise<void> {
@@ -356,7 +406,9 @@ class TaskBoardViewProvider implements vscode.WebviewViewProvider {
   }
 
   private post(message: unknown): void {
-    void this.view?.webview.postMessage(message);
+    for (const webview of this.webviews) {
+      void webview.postMessage(message);
+    }
   }
 
   private async onMessage(msg: WebviewToExtMessage): Promise<void> {

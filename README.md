@@ -63,6 +63,9 @@ Required variables:
 - `AZDO_PROJECT` e.g. `YourProject`
 - `AZDO_PAT` a PAT with at least **Work Items (read)**
 
+Notes:
+- The examples above are placeholders. Do not commit real org/project names or any PATs to Git.
+
 2) Call the MCP tool
 - Tool: `azure_devops_import_assigned_to_me`
 - Defaults read from `.env`.
