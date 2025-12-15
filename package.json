@@ -4,6 +4,15 @@
   "description": "Kanban board + JSON persistence + copy task as Markdown for Copilot.",
   "version": "0.1.0",
   "publisher": "local",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/And165KMT/kanbanforCopilot.git"
+  },
+  "homepage": "https://github.com/And165KMT/kanbanforCopilot#readme",
+  "bugs": {
+    "url": "https://github.com/And165KMT/kanbanforCopilot/issues"
+  },
   "engines": {
     "vscode": "^1.90.0"
   },
