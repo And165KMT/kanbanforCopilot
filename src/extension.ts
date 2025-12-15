@@ -653,23 +653,27 @@ class TaskBoardViewProvider implements vscode.WebviewViewProvider {
         const top = await vscode.window.showInputBox({
           title: 'Optional: Import top N',
           prompt: '取り込み件数（例: 200）',
-          value: existing.AZDO_TOP ?? ''
+          value: (existing.AZDO_TOP ?? '').trim() || '200'
         });
         if (top === undefined) return;
 
         const workItemTypes = await vscode.window.showInputBox({
           title: 'Optional: Work item types',
           prompt: '例: Task,Issue',
-          value: existing.AZDO_WORK_ITEM_TYPES ?? ''
+          value: (existing.AZDO_WORK_ITEM_TYPES ?? '').trim() || 'Task,Issue'
         });
         if (workItemTypes === undefined) return;
 
         const excludeStates = await vscode.window.showInputBox({
           title: 'Optional: Exclude states (import)',
           prompt: '例: Done,Closed',
-          value: existing.AZDO_EXCLUDE_STATES ?? ''
+          value: (existing.AZDO_EXCLUDE_STATES ?? '').trim() || 'Done,Closed'
         });
         if (excludeStates === undefined) return;
+
+        const normalizedTop = top.trim() || '200';
+        const normalizedWorkItemTypes = workItemTypes.trim() || 'Task,Issue';
+        const normalizedExcludeStates = excludeStates.trim() || 'Done,Closed';
 
         const nextEnv: Record<string, string> = {
           ...existing,
@@ -677,9 +681,9 @@ class TaskBoardViewProvider implements vscode.WebviewViewProvider {
           AZDO_PROJECT: project.trim(),
           AZDO_PAT: pat.trim(),
           AZDO_COLUMN_TO_STATE: columnToState.trim(),
-          AZDO_TOP: top.trim(),
-          AZDO_WORK_ITEM_TYPES: workItemTypes.trim(),
-          AZDO_EXCLUDE_STATES: excludeStates.trim()
+          AZDO_TOP: normalizedTop,
+          AZDO_WORK_ITEM_TYPES: normalizedWorkItemTypes,
+          AZDO_EXCLUDE_STATES: normalizedExcludeStates
         };
 
         const text = serializeDotEnv(nextEnv);
