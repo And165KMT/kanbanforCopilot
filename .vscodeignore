@@ -4,8 +4,12 @@
 mcp/**
 node_modules/**
 
+# include webview UI toolkit runtime (needed at extension runtime)
+!node_modules/@vscode/webview-ui-toolkit/dist/**
+
 # keep webview assets
 !media/**
 
 # build output
 !dist/**
+*.env

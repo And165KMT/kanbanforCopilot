@@ -62,6 +62,7 @@ function render() {
     el('div', { class: 'topbar__title', text: 'Task board' }),
     search,
     button('Columns', () => vscode.postMessage({ type: 'editColumns' })),
+    button('Azureから取り込み', () => vscode.postMessage({ type: 'importAzure' })),
     button('+ New', () => openCreateModal())
   ]);
 

@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { BoardStore } from './boardStore';
 import type { BoardFile, Task } from './types';
+import { fetchAssignedToMeWorkItems } from './azureDevops';
 
 type WebviewToExtMessage =
   | { type: 'ready' }
@@ -10,7 +11,33 @@ type WebviewToExtMessage =
   | { type: 'moveTask'; id: string; status: string; index: number }
   | { type: 'reorderWithinColumn'; status: string; orderedIds: string[] }
   | { type: 'copyTaskMarkdown'; id: string }
-  | { type: 'editColumns' };
+  | { type: 'editColumns' }
+  | { type: 'importAzure' };
+
+function parseDotEnv(text: string): Record<string, string> {
+  const result: Record<string, string> = {};
+  for (const line of text.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+
+    const idx = trimmed.indexOf('=');
+    if (idx <= 0) continue;
+    const key = trimmed.slice(0, idx).trim();
+    let value = trimmed.slice(idx + 1).trim();
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+      value = value.slice(1, -1);
+    }
+    if (key) result[key] = value;
+  }
+  return result;
+}
+
+function splitCsv(value: string | undefined): string[] {
+  return (value ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+}
 
 export function activate(context: vscode.ExtensionContext) {
   const output = vscode.window.createOutputChannel('Kanbanto');
@@ -41,6 +68,9 @@ class TaskBoardViewProvider implements vscode.WebviewViewProvider {
   private board?: BoardFile;
   private watcher?: vscode.FileSystemWatcher;
   private workspaceListener?: vscode.Disposable;
+  private reloadDebounceTimer?: NodeJS.Timeout;
+  private reloadInProgress = false;
+  private reloadPending = false;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -111,14 +141,45 @@ class TaskBoardViewProvider implements vscode.WebviewViewProvider {
 
   private setupWatcher(): void {
     this.watcher?.dispose();
+    if (this.reloadDebounceTimer) {
+      clearTimeout(this.reloadDebounceTimer);
+      this.reloadDebounceTimer = undefined;
+    }
     if (!this.store) return;
 
     const watcherPattern = new vscode.RelativePattern(this.store.rootUri, this.store.boardFileRelativePath);
     this.watcher = vscode.workspace.createFileSystemWatcher(watcherPattern);
-    this.watcher.onDidChange(() => this.reloadFromDisk());
-    this.watcher.onDidCreate(() => this.reloadFromDisk());
-    this.watcher.onDidDelete(() => this.reloadFromDisk());
+    this.watcher.onDidChange(() => this.scheduleReloadFromDisk());
+    this.watcher.onDidCreate(() => this.scheduleReloadFromDisk());
+    this.watcher.onDidDelete(() => this.scheduleReloadFromDisk());
     this.context.subscriptions.push(this.watcher);
+  }
+
+  private scheduleReloadFromDisk(): void {
+    // Windowsでは同一の保存操作で複数イベントが発火しやすいので、短時間にまとめて1回だけ読む。
+    if (this.reloadDebounceTimer) clearTimeout(this.reloadDebounceTimer);
+    this.reloadDebounceTimer = setTimeout(() => {
+      this.reloadDebounceTimer = undefined;
+      void this.reloadFromDiskSerial();
+    }, 150);
+  }
+
+  private async reloadFromDiskSerial(): Promise<void> {
+    if (this.reloadInProgress) {
+      this.reloadPending = true;
+      return;
+    }
+
+    this.reloadInProgress = true;
+    try {
+      await this.reloadFromDisk();
+    } finally {
+      this.reloadInProgress = false;
+      if (this.reloadPending) {
+        this.reloadPending = false;
+        this.scheduleReloadFromDisk();
+      }
+    }
   }
 
   private async reloadFromDisk(): Promise<void> {
@@ -237,17 +298,103 @@ class TaskBoardViewProvider implements vscode.WebviewViewProvider {
         this.postBoard();
         return;
       }
+
+      case 'importAzure': {
+        const store = this.store;
+        const current = this.board ?? (await store.loadOrInit());
+
+        await vscode.window.withProgress(
+          { location: vscode.ProgressLocation.Notification, title: 'Azure DevOps から取り込み中…' },
+          async () => {
+            const envUri = vscode.Uri.joinPath(store.rootUri, '.env');
+            let envText = '';
+            try {
+              const bytes = await vscode.workspace.fs.readFile(envUri);
+              envText = Buffer.from(bytes).toString('utf8');
+            } catch {
+              throw new Error('ワークスペース直下の .env が見つかりません（AZDO_ORG_URL/AZDO_PROJECT/AZDO_PAT を設定してください）');
+            }
+
+            const env = parseDotEnv(envText);
+
+            const orgUrl = (env.AZDO_ORG_URL ?? '').trim();
+            const project = (env.AZDO_PROJECT ?? '').trim();
+            const pat = (env.AZDO_PAT ?? '').trim();
+            if (!orgUrl) throw new Error('AZDO_ORG_URL が .env にありません');
+            if (!project) throw new Error('AZDO_PROJECT が .env にありません');
+            if (!pat) throw new Error('AZDO_PAT が .env にありません');
+
+            const top = env.AZDO_TOP ? Number(env.AZDO_TOP) : 200;
+            const workItemTypes = splitCsv(env.AZDO_WORK_ITEM_TYPES);
+            const excludeStates = splitCsv(env.AZDO_EXCLUDE_STATES);
+
+            const items = await fetchAssignedToMeWorkItems({
+              orgUrl,
+              project,
+              pat,
+              top: Number.isFinite(top) ? top : 200,
+              workItemTypes: workItemTypes.length > 0 ? workItemTypes : ['Task', 'Issue'],
+              excludeStates: excludeStates.length > 0 ? excludeStates : ['Done', 'Closed']
+            });
+
+            const targetStatus = current.columns.includes('Backlog') ? 'Backlog' : current.columns[0];
+
+            let next = current;
+            let imported = 0;
+            let skippedExisting = 0;
+
+            for (const wi of items) {
+              const marker = `ADO#${wi.id}`;
+              const already = next.tasks.some((t) => (t.notes ?? '').includes(marker));
+              if (already) {
+                skippedExisting++;
+                continue;
+              }
+
+              const title = `[ADO#${wi.id}] ${wi.title}`;
+              const notesLines = [
+                marker,
+                `URL: ${wi.url}`,
+                wi.type ? `Type: ${wi.type}` : undefined,
+                wi.state ? `State: ${wi.state}` : undefined
+              ].filter((s): s is string => typeof s === 'string' && s.length > 0);
+
+              const { board } = store.addTask(next, {
+                title,
+                status: targetStatus,
+                priority: 0,
+                goal: wi.description,
+                acceptanceCriteria: wi.acceptanceCriteria,
+                notes: notesLines.join('\n')
+              });
+              next = board;
+              imported++;
+            }
+
+            await store.save(next);
+            this.board = next;
+            this.postBoard();
+
+            void vscode.window.showInformationMessage(
+              `Azure DevOps から取り込み完了: ${imported}件（既存スキップ: ${skippedExisting}件）`
+            );
+          }
+        );
+
+        return;
+      }
     }
   }
 
   private getHtml(webview: vscode.Webview): string {
+    const cacheBust = String(Date.now());
     const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'media', 'main.js'));
     const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'media', 'styles.css'));
     const toolkitUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this.context.extensionUri, 'node_modules', '@vscode', 'webview-ui-toolkit', 'dist', 'toolkit.js')
     );
 
-    const nonce = String(Date.now());
+    const nonce = cacheBust;
 
     return `<!doctype html>
   <html lang="en">
@@ -255,12 +402,12 @@ class TaskBoardViewProvider implements vscode.WebviewViewProvider {
     <meta charset="UTF-8">
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource} data:; style-src ${webview.cspSource}; script-src 'nonce-${nonce}';">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="${styleUri}" />
-    <script nonce="${nonce}" type="module" src="${toolkitUri}"></script>
+    <link rel="stylesheet" href="${styleUri}?v=${cacheBust}" />
+    <script nonce="${nonce}" type="module" src="${toolkitUri}?v=${cacheBust}"></script>
   </head>
   <body>
     <div id="app"></div>
-    <script nonce="${nonce}" src="${scriptUri}"></script>
+    <script nonce="${nonce}" src="${scriptUri}?v=${cacheBust}"></script>
   </body>
 </html>`;
   }
