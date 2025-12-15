@@ -65,6 +65,7 @@ function render() {
     el('div', { class: 'topbar__title', text: 'Task board' }),
     search,
     button('Columns', () => vscode.postMessage({ type: 'editColumns' })),
+    button('Settings', () => vscode.postMessage({ type: 'openEnvSettings' })),
     button('Azureから取り込み', () => vscode.postMessage({ type: 'importAzure' })),
     button('+ New', () => openCreateModal())
   ]);
@@ -344,7 +345,21 @@ function adoCommentSection(task) {
     }
   }, [el('span', { text: '+' })]);
 
-  return el('div', { class: 'field' }, [el('label', { text: 'Azure DevOps' }), area, el('div', { class: 'row' }, [post, postWithAttach])]);
+  const updateDesc = el('vscode-button', {
+    appearance: 'secondary',
+    text: 'Update Description',
+    title: `Update ADO#${id} Description from Goal/Acceptance Criteria`,
+    onclick: () => {
+      vscode.postMessage({
+        type: 'syncAdoDescription',
+        workItemId: id,
+        goal: String(task.goal ?? ''),
+        acceptanceCriteria: Array.isArray(task.acceptanceCriteria) ? task.acceptanceCriteria : []
+      });
+    }
+  });
+
+  return el('div', { class: 'field' }, [el('label', { text: 'Azure DevOps' }), area, el('div', { class: 'row' }, [post, postWithAttach, updateDesc])]);
 }
 
 async function fileToBase64(file) {

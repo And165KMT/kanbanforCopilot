@@ -231,6 +231,43 @@ export async function updateWorkItemState(config: {
   }
 }
 
+export async function updateWorkItemDescription(config: {
+  orgUrl: string;
+  project: string;
+  pat: string;
+  id: number;
+  descriptionHtml: string;
+}): Promise<void> {
+  const orgUrl = normalizeOrgUrl(config.orgUrl);
+  const project = config.project.trim();
+  if (!project) throw new Error('AZDO_PROJECT is required');
+  const pat = config.pat.trim();
+  if (!pat) throw new Error('AZDO_PAT is required');
+  const id = Number(config.id);
+  if (!Number.isFinite(id) || id <= 0) throw new Error('Work Item ID is invalid');
+
+  const descriptionHtml = String(config.descriptionHtml ?? '').trim();
+  if (!descriptionHtml) throw new Error('Description が空です');
+
+  const url = `${orgUrl}/${encodeURIComponent(project)}/_apis/wit/workitems/${id}?api-version=7.1`;
+  const patch = [{ op: 'add', path: '/fields/System.Description', value: descriptionHtml }];
+
+  const res = await requestJson({
+    url,
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json-patch+json',
+      Authorization: authHeaderFromPat(pat)
+    },
+    body: JSON.stringify(patch)
+  });
+
+  if (res.status < 200 || res.status >= 300) {
+    const msg = typeof res.body === 'string' ? res.body : JSON.stringify(res.body);
+    throw new Error(`Azure DevOps description update failed (${res.status}): ${msg}`);
+  }
+}
+
 export async function attachFileToWorkItem(config: {
   orgUrl: string;
   project: string;

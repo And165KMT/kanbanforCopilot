@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'node:path';
 import { BoardStore } from './boardStore';
 import type { BoardFile, Task } from './types';
-import { addWorkItemHistoryComment, attachFileToWorkItem, fetchAssignedToMeWorkItems, fetchWorkItemTypeStates, updateWorkItemState } from './azureDevops';
+import { addWorkItemHistoryComment, attachFileToWorkItem, fetchAssignedToMeWorkItems, fetchWorkItemTypeStates, updateWorkItemDescription, updateWorkItemState } from './azureDevops';
 
 type WebviewToExtMessage =
   | { type: 'ready' }
@@ -16,8 +16,42 @@ type WebviewToExtMessage =
   | { type: 'addAdoComment'; workItemId: number; comment: string }
   | { type: 'addAdoCommentWithAttachment'; workItemId: number; comment: string }
   | { type: 'addAdoAttachment'; workItemId: number; fileName: string; mime: string; dataBase64: string; comment?: string }
+  | { type: 'syncAdoDescription'; workItemId: number; goal: string; acceptanceCriteria: string[] }
+  | { type: 'openEnvSettings' }
   | { type: 'editColumns' }
   | { type: 'importAzure' };
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function toDescriptionHtml(goal: string, acceptanceCriteria: string[]): string {
+  const parts: string[] = [];
+  const g = String(goal ?? '').trim();
+  const ac = Array.isArray(acceptanceCriteria)
+    ? acceptanceCriteria.map((s) => String(s ?? '').trim()).filter((s) => s.length > 0)
+    : [];
+
+  if (g) {
+    const lines = g.split(/\r?\n/).map((l) => escapeHtml(l));
+    parts.push('<h2>Goal</h2>');
+    parts.push(`<p>${lines.join('<br/>')}</p>`);
+  }
+
+  if (ac.length > 0) {
+    parts.push('<h2>Acceptance Criteria</h2>');
+    parts.push('<ul>');
+    for (const item of ac) parts.push(`<li>${escapeHtml(item)}</li>`);
+    parts.push('</ul>');
+  }
+
+  return parts.join('\n').trim();
+}
 
 function parseDotEnv(text: string): Record<string, string> {
   const result: Record<string, string> = {};
@@ -35,6 +69,36 @@ function parseDotEnv(text: string): Record<string, string> {
     if (key) result[key] = value;
   }
   return result;
+}
+
+function serializeDotEnv(env: Record<string, string>): string {
+  const lines: string[] = [];
+  lines.push('# Kanbanto Azure DevOps settings');
+  lines.push('# Required: AZDO_ORG_URL, AZDO_PROJECT, AZDO_PAT');
+  lines.push('# Optional: AZDO_COLUMN_TO_STATE, AZDO_TOP, AZDO_WORK_ITEM_TYPES, AZDO_EXCLUDE_STATES');
+  lines.push('');
+
+  const orderedKeys = [
+    'AZDO_ORG_URL',
+    'AZDO_PROJECT',
+    'AZDO_PAT',
+    'AZDO_COLUMN_TO_STATE',
+    'AZDO_TOP',
+    'AZDO_WORK_ITEM_TYPES',
+    'AZDO_EXCLUDE_STATES'
+  ];
+
+  const extraKeys = Object.keys(env)
+    .filter((k) => !orderedKeys.includes(k))
+    .sort((a, b) => a.localeCompare(b));
+
+  for (const key of [...orderedKeys, ...extraKeys]) {
+    const value = env[key];
+    if (value === undefined) continue;
+    lines.push(`${key}=${value}`);
+  }
+
+  return lines.join('\n') + '\n';
 }
 
 function splitCsv(value: string | undefined): string[] {
@@ -149,6 +213,9 @@ export function activate(context: vscode.ExtensionContext) {
 
 class TaskBoardViewProvider implements vscode.WebviewViewProvider {
   static readonly viewType = 'kanbanto.boardView';
+
+  private static readonly preferredEnvRelativePath = '.kanbanto/.env';
+  private static readonly fallbackEnvRelativePath = '.env';
 
   private view?: vscode.WebviewView;
   private store?: BoardStore;
@@ -403,7 +470,6 @@ class TaskBoardViewProvider implements vscode.WebviewViewProvider {
       }
 
       case 'addAdoComment': {
-        const store = this.store;
         const workItemId = Number(msg.workItemId);
         const comment = String(msg.comment ?? '').trim();
         if (!Number.isFinite(workItemId) || workItemId <= 0) throw new Error('ADO Work Item ID が不正です');
@@ -412,22 +478,7 @@ class TaskBoardViewProvider implements vscode.WebviewViewProvider {
         await vscode.window.withProgress(
           { location: vscode.ProgressLocation.Notification, title: `ADO#${workItemId} にコメント投稿中…` },
           async () => {
-            const envUri = vscode.Uri.joinPath(store.rootUri, '.env');
-            let envText = '';
-            try {
-              const bytes = await vscode.workspace.fs.readFile(envUri);
-              envText = Buffer.from(bytes).toString('utf8');
-            } catch {
-              throw new Error('ワークスペース直下の .env が見つかりません（AZDO_ORG_URL/AZDO_PROJECT/AZDO_PAT を設定してください）');
-            }
-
-            const env = parseDotEnv(envText);
-            const orgUrl = (env.AZDO_ORG_URL ?? '').trim();
-            const project = (env.AZDO_PROJECT ?? '').trim();
-            const pat = (env.AZDO_PAT ?? '').trim();
-            if (!orgUrl) throw new Error('AZDO_ORG_URL が .env にありません');
-            if (!project) throw new Error('AZDO_PROJECT が .env にありません');
-            if (!pat) throw new Error('AZDO_PAT が .env にありません');
+            const { orgUrl, project, pat } = await this.loadAzdoConfig();
 
             await addWorkItemHistoryComment({ orgUrl, project, pat, id: workItemId, comment });
             void vscode.window.showInformationMessage(`ADO#${workItemId} にコメントを投稿しました`);
@@ -537,6 +588,109 @@ class TaskBoardViewProvider implements vscode.WebviewViewProvider {
         return;
       }
 
+      case 'syncAdoDescription': {
+        const workItemId = Number(msg.workItemId);
+        if (!Number.isFinite(workItemId) || workItemId <= 0) throw new Error('ADO Work Item ID が不正です');
+
+        const html = toDescriptionHtml(String(msg.goal ?? ''), Array.isArray(msg.acceptanceCriteria) ? msg.acceptanceCriteria : []);
+        if (!html) {
+          void vscode.window.showWarningMessage('Goal / Acceptance criteria が空のため、更新しません');
+          return;
+        }
+
+        await vscode.window.withProgress(
+          { location: vscode.ProgressLocation.Notification, title: `ADO#${workItemId} の Description を更新中…` },
+          async () => {
+            const { orgUrl, project, pat } = await this.loadAzdoConfig();
+            await updateWorkItemDescription({ orgUrl, project, pat, id: workItemId, descriptionHtml: html });
+          }
+        );
+
+        void vscode.window.showInformationMessage(`ADO#${workItemId} の Description を更新しました`);
+        return;
+      }
+
+      case 'openEnvSettings': {
+        const store = this.store;
+        if (!store) {
+          await this.ensureStoreAndLoad();
+          return;
+        }
+
+        const envUriForWrite = this.getEnvUriForWrite(store);
+        const envText = await this.tryReadEnvText(store);
+        const existing = envText ? parseDotEnv(envText) : {};
+
+        const orgUrl = await vscode.window.showInputBox({
+          title: 'Azure DevOps: Org URL',
+          prompt: '例: https://dev.azure.com/YourOrg',
+          value: existing.AZDO_ORG_URL ?? ''
+        });
+        if (orgUrl === undefined) return;
+
+        const project = await vscode.window.showInputBox({
+          title: 'Azure DevOps: Project',
+          prompt: 'ADOのプロジェクト名',
+          value: existing.AZDO_PROJECT ?? ''
+        });
+        if (project === undefined) return;
+
+        const pat = await vscode.window.showInputBox({
+          title: 'Azure DevOps: PAT',
+          prompt: 'Work Items (read & write) が必要です',
+          password: true,
+          value: existing.AZDO_PAT ?? ''
+        });
+        if (pat === undefined) return;
+
+        const columnToState = await vscode.window.showInputBox({
+          title: 'Optional: Column -> State mapping',
+          prompt: '例: Backlog=New,To Do=To Do,In Progress=Doing,Review=Review,Done=Done',
+          value: existing.AZDO_COLUMN_TO_STATE ?? ''
+        });
+        if (columnToState === undefined) return;
+
+        const top = await vscode.window.showInputBox({
+          title: 'Optional: Import top N',
+          prompt: '取り込み件数（例: 200）',
+          value: existing.AZDO_TOP ?? ''
+        });
+        if (top === undefined) return;
+
+        const workItemTypes = await vscode.window.showInputBox({
+          title: 'Optional: Work item types',
+          prompt: '例: Task,Issue',
+          value: existing.AZDO_WORK_ITEM_TYPES ?? ''
+        });
+        if (workItemTypes === undefined) return;
+
+        const excludeStates = await vscode.window.showInputBox({
+          title: 'Optional: Exclude states (import)',
+          prompt: '例: Done,Closed',
+          value: existing.AZDO_EXCLUDE_STATES ?? ''
+        });
+        if (excludeStates === undefined) return;
+
+        const nextEnv: Record<string, string> = {
+          ...existing,
+          AZDO_ORG_URL: orgUrl.trim(),
+          AZDO_PROJECT: project.trim(),
+          AZDO_PAT: pat.trim(),
+          AZDO_COLUMN_TO_STATE: columnToState.trim(),
+          AZDO_TOP: top.trim(),
+          AZDO_WORK_ITEM_TYPES: workItemTypes.trim(),
+          AZDO_EXCLUDE_STATES: excludeStates.trim()
+        };
+
+        const text = serializeDotEnv(nextEnv);
+        const dirUri = vscode.Uri.joinPath(store.rootUri, ...this.splitRelPath(TaskBoardViewProvider.preferredEnvRelativePath).slice(0, -1));
+        await vscode.workspace.fs.createDirectory(dirUri);
+        await vscode.workspace.fs.writeFile(envUriForWrite, Buffer.from(text, 'utf8'));
+        this.azdoCache = undefined;
+        void vscode.window.showInformationMessage(`${TaskBoardViewProvider.preferredEnvRelativePath} を更新しました`);
+        return;
+      }
+
       case 'editColumns': {
         const current = this.board ?? (await this.store.loadOrInit());
         const value = current.columns.join(', ');
@@ -567,14 +721,7 @@ class TaskBoardViewProvider implements vscode.WebviewViewProvider {
         await vscode.window.withProgress(
           { location: vscode.ProgressLocation.Notification, title: 'Azure DevOps から取り込み中…' },
           async () => {
-            const envUri = vscode.Uri.joinPath(store.rootUri, '.env');
-            let envText = '';
-            try {
-              const bytes = await vscode.workspace.fs.readFile(envUri);
-              envText = Buffer.from(bytes).toString('utf8');
-            } catch {
-              throw new Error('ワークスペース直下の .env が見つかりません（AZDO_ORG_URL/AZDO_PROJECT/AZDO_PAT を設定してください）');
-            }
+            const envText = await this.readEnvText(store);
 
             const env = parseDotEnv(envText);
 
@@ -661,19 +808,50 @@ class TaskBoardViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  private splitRelPath(relPath: string): string[] {
+    return relPath
+      .replace(/\\/g, '/')
+      .split('/')
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+  }
+
+  private getEnvUriForWrite(store: BoardStore): vscode.Uri {
+    return vscode.Uri.joinPath(store.rootUri, ...this.splitRelPath(TaskBoardViewProvider.preferredEnvRelativePath));
+  }
+
+  private async tryReadEnvText(store: BoardStore): Promise<string | undefined> {
+    const preferred = vscode.Uri.joinPath(store.rootUri, ...this.splitRelPath(TaskBoardViewProvider.preferredEnvRelativePath));
+    try {
+      const bytes = await vscode.workspace.fs.readFile(preferred);
+      return Buffer.from(bytes).toString('utf8');
+    } catch {
+      // fall through
+    }
+
+    const fallback = vscode.Uri.joinPath(store.rootUri, ...this.splitRelPath(TaskBoardViewProvider.fallbackEnvRelativePath));
+    try {
+      const bytes = await vscode.workspace.fs.readFile(fallback);
+      return Buffer.from(bytes).toString('utf8');
+    } catch {
+      return undefined;
+    }
+  }
+
+  private async readEnvText(store: BoardStore): Promise<string> {
+    const text = await this.tryReadEnvText(store);
+    if (text !== undefined) return text;
+    throw new Error(
+      `${TaskBoardViewProvider.preferredEnvRelativePath} または ${TaskBoardViewProvider.fallbackEnvRelativePath} が見つかりません（AZDO_ORG_URL/AZDO_PROJECT/AZDO_PAT を設定してください）`
+    );
+  }
+
   private async loadAzdoConfig(): Promise<{ orgUrl: string; project: string; pat: string; columnToState: Record<string, string> }> {
     if (this.azdoCache) return this.azdoCache;
     const store = this.store;
     if (!store) throw new Error('Store is not ready');
 
-    const envUri = vscode.Uri.joinPath(store.rootUri, '.env');
-    let envText = '';
-    try {
-      const bytes = await vscode.workspace.fs.readFile(envUri);
-      envText = Buffer.from(bytes).toString('utf8');
-    } catch {
-      throw new Error('ワークスペース直下の .env が見つかりません（AZDO_ORG_URL/AZDO_PROJECT/AZDO_PAT を設定してください）');
-    }
+    const envText = await this.readEnvText(store);
 
     const env = parseDotEnv(envText);
     const orgUrl = (env.AZDO_ORG_URL ?? '').trim();
