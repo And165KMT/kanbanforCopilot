@@ -49,7 +49,24 @@ Notes:
 This repo includes an MCP (Model Context Protocol) server so tools can directly read/write the same board file.
 
 - Project: [mcp/kanbanto-mcp](mcp/kanbanto-mcp)
-- Tools: `board_get`, `tasks_list`, `task_add`, `task_update`, `task_move`, `task_delete`, `column_reorder`, `columns_update`, `board_normalize`
+- Tools: `board_get`, `tasks_list`, `task_add`, `task_update`, `task_move`, `task_delete`, `column_reorder`, `columns_update`, `board_normalize`, `azure_devops_import_assigned_to_me`
+
+### Azure DevOps import (PAT)
+
+The MCP server can import Azure DevOps work items assigned to the PAT owner (`@Me`) and add them as Kanbanto tasks.
+
+1) Create a `.env` file in the workspace folder (this repo ignores it via `.gitignore`)
+Use the template [.env.example](.env.example).
+
+Required variables:
+- `AZDO_ORG_URL` e.g. `https://dev.azure.com/YourOrg`
+- `AZDO_PROJECT` e.g. `YourProject`
+- `AZDO_PAT` a PAT with at least **Work Items (read)**
+
+2) Call the MCP tool
+- Tool: `azure_devops_import_assigned_to_me`
+- Defaults read from `.env`.
+- Imported tasks include an `ADO#12345` marker in `notes` so re-import can skip duplicates.
 
 ### Configure MCP (so Copilot can manage tasks)
 
