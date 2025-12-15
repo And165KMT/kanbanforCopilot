@@ -98,9 +98,9 @@ function buildDefaultWiql(params: {
 
 async function requestJson(params: {
   url: string;
-  method: 'GET' | 'POST';
+  method: 'GET' | 'POST' | 'PATCH';
   headers?: Record<string, string>;
-  body?: string;
+  body?: string | Buffer;
 }): Promise<{ status: number; body: any }>{
   const u = new URL(params.url);
 
@@ -131,7 +131,7 @@ async function requestJson(params: {
     );
 
     req.on('error', reject);
-    if (params.body) req.write(params.body);
+    if (params.body !== undefined) req.write(params.body);
     req.end();
   });
 }
@@ -154,6 +154,154 @@ export type AzureWorkItem = {
   description?: string;
   acceptanceCriteria?: string[];
 };
+
+export async function addWorkItemHistoryComment(config: {
+  orgUrl: string;
+  project: string;
+  pat: string;
+  id: number;
+  comment: string;
+}): Promise<void> {
+  const orgUrl = normalizeOrgUrl(config.orgUrl);
+  const project = config.project.trim();
+  if (!project) throw new Error('AZDO_PROJECT is required');
+  const pat = config.pat.trim();
+  if (!pat) throw new Error('AZDO_PAT is required');
+  const id = Number(config.id);
+  if (!Number.isFinite(id) || id <= 0) throw new Error('Work Item ID is invalid');
+
+  const comment = String(config.comment ?? '').trim();
+  if (!comment) throw new Error('コメントが空です');
+
+  const url = `${orgUrl}/${encodeURIComponent(project)}/_apis/wit/workitems/${id}?api-version=7.1`;
+  const patch = [
+    { op: 'add', path: '/fields/System.History', value: comment }
+  ];
+
+  const res = await requestJson({
+    url,
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json-patch+json',
+      Authorization: authHeaderFromPat(pat)
+    },
+    body: JSON.stringify(patch)
+  });
+
+  if (res.status < 200 || res.status >= 300) {
+    const msg = typeof res.body === 'string' ? res.body : JSON.stringify(res.body);
+    throw new Error(`Azure DevOps comment failed (${res.status}): ${msg}`);
+  }
+}
+
+export async function updateWorkItemState(config: {
+  orgUrl: string;
+  project: string;
+  pat: string;
+  id: number;
+  state: string;
+}): Promise<void> {
+  const orgUrl = normalizeOrgUrl(config.orgUrl);
+  const project = config.project.trim();
+  if (!project) throw new Error('AZDO_PROJECT is required');
+  const pat = config.pat.trim();
+  if (!pat) throw new Error('AZDO_PAT is required');
+  const id = Number(config.id);
+  if (!Number.isFinite(id) || id <= 0) throw new Error('Work Item ID is invalid');
+
+  const state = String(config.state ?? '').trim();
+  if (!state) throw new Error('State が空です');
+
+  const url = `${orgUrl}/${encodeURIComponent(project)}/_apis/wit/workitems/${id}?api-version=7.1`;
+  const patch = [{ op: 'add', path: '/fields/System.State', value: state }];
+
+  const res = await requestJson({
+    url,
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json-patch+json',
+      Authorization: authHeaderFromPat(pat)
+    },
+    body: JSON.stringify(patch)
+  });
+
+  if (res.status < 200 || res.status >= 300) {
+    const msg = typeof res.body === 'string' ? res.body : JSON.stringify(res.body);
+    throw new Error(`Azure DevOps state update failed (${res.status}): ${msg}`);
+  }
+}
+
+export async function attachFileToWorkItem(config: {
+  orgUrl: string;
+  project: string;
+  pat: string;
+  id: number;
+  fileName: string;
+  content: Buffer;
+  comment?: string;
+}): Promise<void> {
+  const orgUrl = normalizeOrgUrl(config.orgUrl);
+  const project = config.project.trim();
+  if (!project) throw new Error('AZDO_PROJECT is required');
+  const pat = config.pat.trim();
+  if (!pat) throw new Error('AZDO_PAT is required');
+  const id = Number(config.id);
+  if (!Number.isFinite(id) || id <= 0) throw new Error('Work Item ID is invalid');
+
+  const fileName = String(config.fileName ?? '').trim();
+  if (!fileName) throw new Error('fileName is required');
+  if (!Buffer.isBuffer(config.content) || config.content.length === 0) throw new Error('content is empty');
+
+  // 1) Upload attachment bytes
+  const uploadUrl = `${orgUrl}/_apis/wit/attachments?fileName=${encodeURIComponent(fileName)}&api-version=7.1`;
+  const uploadRes = await requestJson({
+    url: uploadUrl,
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/octet-stream',
+      Authorization: authHeaderFromPat(pat)
+    },
+    body: config.content
+  });
+
+  if (uploadRes.status < 200 || uploadRes.status >= 300) {
+    const msg = typeof uploadRes.body === 'string' ? uploadRes.body : JSON.stringify(uploadRes.body);
+    throw new Error(`Azure DevOps attachment upload failed (${uploadRes.status}): ${msg}`);
+  }
+
+  const attachmentUrl = String(uploadRes.body?.url ?? '').trim();
+  if (!attachmentUrl) throw new Error('Azure DevOps attachment upload returned no url');
+
+  // 2) Link attachment to work item
+  const wiUrl = `${orgUrl}/${encodeURIComponent(project)}/_apis/wit/workitems/${id}?api-version=7.1`;
+  const relComment = String(config.comment ?? '').trim();
+  const patch = [
+    {
+      op: 'add',
+      path: '/relations/-',
+      value: {
+        rel: 'AttachedFile',
+        url: attachmentUrl,
+        attributes: relComment ? { comment: relComment } : undefined
+      }
+    }
+  ];
+
+  const linkRes = await requestJson({
+    url: wiUrl,
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json-patch+json',
+      Authorization: authHeaderFromPat(pat)
+    },
+    body: JSON.stringify(patch)
+  });
+
+  if (linkRes.status < 200 || linkRes.status >= 300) {
+    const msg = typeof linkRes.body === 'string' ? linkRes.body : JSON.stringify(linkRes.body);
+    throw new Error(`Azure DevOps attachment link failed (${linkRes.status}): ${msg}`);
+  }
+}
 
 export async function fetchAssignedToMeWorkItems(config: AzureDevopsImportConfig): Promise<AzureWorkItem[]> {
   const orgUrl = normalizeOrgUrl(config.orgUrl);
@@ -236,4 +384,41 @@ export async function fetchAssignedToMeWorkItems(config: AzureDevopsImportConfig
       };
     })
     .filter((x) => Number.isFinite(x.id));
+}
+
+export async function fetchWorkItemTypeStates(config: {
+  orgUrl: string;
+  project: string;
+  pat: string;
+  type: string;
+}): Promise<string[]> {
+  const orgUrl = normalizeOrgUrl(config.orgUrl);
+  const project = config.project.trim();
+  if (!project) throw new Error('AZDO_PROJECT is required');
+  const pat = config.pat.trim();
+  if (!pat) throw new Error('AZDO_PAT is required');
+
+  const type = String(config.type ?? '').trim();
+  if (!type) return [];
+
+  // Endpoint: work item type states
+  const url = `${orgUrl}/${encodeURIComponent(project)}/_apis/wit/workitemtypes/${encodeURIComponent(type)}/states?api-version=7.1`;
+  const res = await requestJson({
+    url,
+    method: 'GET',
+    headers: {
+      Authorization: authHeaderFromPat(pat)
+    }
+  });
+
+  if (res.status < 200 || res.status >= 300) {
+    return [];
+  }
+
+  const values = Array.isArray(res.body?.value) ? res.body.value : [];
+  const names = values
+    .map((s: any) => String(s?.name ?? '').trim())
+    .filter((s: string) => s.length > 0);
+
+  return Array.from(new Set(names));
 }
