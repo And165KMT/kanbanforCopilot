@@ -1,0 +1,72 @@
+{
+  "name": "kanbanto-copilot",
+  "displayName": "Kanban to Copilot",
+  "description": "Kanban board + JSON persistence + copy task as Markdown for Copilot.",
+  "version": "0.1.0",
+  "publisher": "local",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": ["Other"],
+  "activationEvents": [
+    "onView:kanbanto.boardView",
+    "onCommand:kanbanto.openBoard",
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "kanbanto",
+          "title": "Task board",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "kanbanto": [
+        {
+          "id": "kanbanto.boardView",
+          "name": "Task board",
+          "type": "webview",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "kanbanto.openBoard",
+        "title": "Kanban: Open Task board"
+      }
+    ],
+    "configuration": {
+      "title": "Kanbanto",
+      "properties": {
+        "kanbanto.workspacePath": {
+          "type": "string",
+          "default": "",
+          "description": "Absolute folder path Kanbanto reads/writes. If empty, uses the currently opened workspace folder."
+        },
+        "kanbanto.boardFileRelativePath": {
+          "type": "string",
+          "default": ".kanbanto/tasks.json",
+          "description": "Relative path to the board JSON under workspacePath. Default: .kanbanto/tasks.json"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run build",
+    "build": "tsc -p tsconfig.json",
+    "watch": "tsc -watch -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/vscode": "^1.90.0",
+    "typescript": "^5.6.3"
+  },
+  "dependencies": {
+    "@vscode/webview-ui-toolkit": "^1.4.0"
+  }
+}

@@ -1,0 +1,11 @@
+.vscode/**
+**/*.ts
+**/*.map
+mcp/**
+node_modules/**
+
+# keep webview assets
+!media/**
+
+# build output
+!dist/**
