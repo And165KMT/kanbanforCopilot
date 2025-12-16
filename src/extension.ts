@@ -11,7 +11,8 @@ type WebviewToExtMessage =
   | { type: 'deleteTask'; id: string }
   | { type: 'moveTask'; id: string; status: string; index: number }
   | { type: 'reorderWithinColumn'; status: string; orderedIds: string[] }
-  | { type: 'copyTaskMarkdown'; id: string }
+  | { type: 'copyTaskMarkdown'; id: string; markdown?: string }
+  | { type: 'notify'; level?: 'info' | 'warning' | 'error'; message: string }
   | { type: 'openUrl'; url: string }
   | { type: 'addAdoComment'; workItemId: number; comment: string }
   | { type: 'addAdoCommentWithAttachment'; workItemId: number; comment: string }
@@ -423,6 +424,24 @@ class TaskBoardViewProvider implements vscode.WebviewViewProvider {
         return;
       }
 
+      case 'notify': {
+        const message = String(msg.message ?? '').trim();
+        if (!message) return;
+
+        const level = msg.level ?? 'info';
+        if (level === 'warning') {
+          void vscode.window.showWarningMessage(message);
+          return;
+        }
+        if (level === 'error') {
+          void vscode.window.showErrorMessage(message);
+          return;
+        }
+
+        void vscode.window.showInformationMessage(message);
+        return;
+      }
+
       case 'addTask': {
         const current = this.board ?? (await this.store.loadOrInit());
         const status = current.columns.includes(msg.task.status) ? msg.task.status : current.columns[0];
@@ -493,11 +512,13 @@ class TaskBoardViewProvider implements vscode.WebviewViewProvider {
       }
 
       case 'copyTaskMarkdown': {
-        const current = this.board ?? (await this.store.loadOrInit());
-        const task = current.tasks.find((t) => t.id === msg.id);
-        if (!task) throw new Error(`Task not found: ${msg.id}`);
-
-        const md = taskToMarkdown(task);
+        let md = typeof msg.markdown === 'string' ? msg.markdown : '';
+        if (!md) {
+          const current = this.board ?? (await this.store.loadOrInit());
+          const task = current.tasks.find((t) => t.id === msg.id);
+          if (!task) throw new Error(`Task not found: ${msg.id}`);
+          md = taskToMarkdown(task);
+        }
         await vscode.env.clipboard.writeText(md);
         void vscode.window.showInformationMessage('Copied task as Markdown');
         return;
