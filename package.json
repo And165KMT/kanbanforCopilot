@@ -1,0 +1,239 @@
+{
+  "name": "ros2-topic-viewer",
+  "displayName": "ROS 2 Topic Viewer",
+  "description": "View ROS 2 topics and stream messages inside VS Code.",
+  "version": "0.0.1",
+  "publisher": "local",
+  "icon": "resources/icon.png",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./out/extension.js",
+  "dependencies": {
+    "iconv-lite": "^0.6.3"
+  },
+  "contributes": {
+    "views": {
+      "explorer": [
+        {
+          "id": "ros2TopicViewer.topicsView",
+          "name": "ROS 2 Topics",
+          "icon": "resources/view.svg"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "ros2TopicViewer.refreshTopics",
+        "title": "ROS2: Refresh Topics",
+        "icon": {
+          "light": "resources/light/refresh.svg",
+          "dark": "resources/dark/refresh.svg"
+        }
+      },
+      {
+        "command": "ros2TopicViewer.openTopicPanel",
+        "title": "ROS2: Open Topic Panel"
+      },
+      {
+        "command": "ros2TopicViewer.copyTopicName",
+        "title": "ROS2: Copy Topic Name"
+      },
+      {
+        "command": "ros2TopicViewer.copyTopicType",
+        "title": "ROS2: Copy Topic Type"
+      },
+      {
+        "command": "ros2TopicViewer.showTopicInfo",
+        "title": "ROS2: Show Topic Info"
+      },
+      {
+        "command": "ros2TopicViewer.echoTopic",
+        "title": "ROS2: Echo Topic"
+      },
+      {
+        "command": "ros2TopicViewer.echoTopicOnce",
+        "title": "ROS2: Echo Topic (Once)"
+      },
+      {
+        "command": "ros2TopicViewer.stopEcho",
+        "title": "ROS2: Stop Echo"
+      },
+      {
+        "command": "ros2TopicViewer.selectDockerContainer",
+        "title": "ROS2: Select Docker Container"
+      },
+      {
+        "command": "ros2TopicViewer.diagnostics",
+        "title": "ROS2: Diagnostics (Check CLI)"
+      },
+      {
+        "command": "ros2TopicViewer.showTopicHz",
+        "title": "ROS2: Show Topic Hz"
+      },
+      {
+        "command": "ros2TopicViewer.showTopicBw",
+        "title": "ROS2: Show Topic Bw"
+      },
+      {
+        "command": "ros2TopicViewer.topicActions",
+        "title": "ROS2: Topic Actions",
+        "icon": "$(ellipsis)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "ros2TopicViewer.refreshTopics",
+          "when": "view == ros2TopicViewer.topicsView",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "ros2TopicViewer.topicActions",
+          "when": "view == ros2TopicViewer.topicsView && viewItem == ros2TopicViewer.topic",
+          "group": "inline"
+        },
+        {
+          "command": "ros2TopicViewer.stopEcho",
+          "when": "view == ros2TopicViewer.topicsView",
+          "group": "navigation"
+        },
+        {
+          "command": "ros2TopicViewer.echoTopic",
+          "when": "view == ros2TopicViewer.topicsView && viewItem == ros2TopicViewer.topic",
+          "group": "1_actions"
+        },
+        {
+          "command": "ros2TopicViewer.echoTopicOnce",
+          "when": "view == ros2TopicViewer.topicsView && viewItem == ros2TopicViewer.topic",
+          "group": "1_actions"
+        },
+        {
+          "command": "ros2TopicViewer.showTopicHz",
+          "when": "view == ros2TopicViewer.topicsView && viewItem == ros2TopicViewer.topic",
+          "group": "1_actions"
+        },
+        {
+          "command": "ros2TopicViewer.showTopicBw",
+          "when": "view == ros2TopicViewer.topicsView && viewItem == ros2TopicViewer.topic",
+          "group": "1_actions"
+        },
+        {
+          "command": "ros2TopicViewer.showTopicInfo",
+          "when": "view == ros2TopicViewer.topicsView && viewItem == ros2TopicViewer.topic",
+          "group": "1_actions"
+        },
+        {
+          "command": "ros2TopicViewer.copyTopicName",
+          "when": "view == ros2TopicViewer.topicsView && viewItem == ros2TopicViewer.topic",
+          "group": "9_clipboard"
+        },
+        {
+          "command": "ros2TopicViewer.copyTopicType",
+          "when": "view == ros2TopicViewer.topicsView && viewItem == ros2TopicViewer.topic",
+          "group": "9_clipboard"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "ROS2 Topic Viewer",
+      "properties": {
+        "ros2TopicViewer.ros2Command": {
+          "type": "string",
+          "default": "ros2",
+          "description": "Command used to run ROS 2 CLI (Windows native default: ros2)."
+        },
+        "ros2TopicViewer.commandTemplate": {
+          "type": "string",
+          "default": "",
+          "description": "Optional shell command template. Use ${args} for ros2 arguments. If using Docker, you can also use ${container}. Example: docker exec -i ${container} bash -lc 'source /opt/ros/humble/setup.bash && ros2 ${args}'"
+        },
+        "ros2TopicViewer.dockerContainer": {
+          "type": "string",
+          "default": "",
+          "description": "Target Docker container name for ${container} placeholder. You can set it manually or via the command 'ROS2: Select Docker Container'."
+        },
+        "ros2TopicViewer.env": {
+          "type": "object",
+          "default": {},
+          "description": "Additional environment variables passed to ros2 CLI (e.g. ROS_DOMAIN_ID).",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "ros2TopicViewer.rosDomainId": {
+          "type": ["number", "string"],
+          "default": "",
+          "description": "Optional ROS_DOMAIN_ID injected into ros2 execution environment. Leave empty to not set."
+        },
+        "ros2TopicViewer.rmwImplementation": {
+          "type": "string",
+          "default": "",
+          "enum": [
+            "",
+            "rmw_cyclonedds_cpp",
+            "rmw_fastrtps_cpp",
+            "rmw_fastrtps_dynamic_cpp",
+            "rmw_connextdds"
+          ],
+          "description": "Optional RMW_IMPLEMENTATION injected into ros2 execution environment. Leave empty to use container/default."
+        },
+        "ros2TopicViewer.outputEncoding": {
+          "type": "string",
+          "default": "auto",
+          "enum": ["auto", "utf8", "cp932"],
+          "description": "How to decode ros2 CLI output. auto: UTF-8 first, fallback to CP932 on Windows if UTF-8 looks invalid. Use utf8 for Docker/WSL outputs, cp932 for native Windows ros2 outputs."
+        },
+        "ros2TopicViewer.waveform.fieldPath": {
+          "type": "string",
+          "default": "",
+          "description": "Dot-path to a numeric field to plot from `ros2 topic echo` output (e.g. `twist.linear.x`). Empty disables waveform sampling."
+        },
+        "ros2TopicViewer.waveform.maxPoints": {
+          "type": "number",
+          "default": 2000,
+          "minimum": 100,
+          "description": "Maximum number of points kept in memory for the waveform ring buffer."
+        },
+        "ros2TopicViewer.waveform.throttleMs": {
+          "type": "number",
+          "default": 50,
+          "minimum": 0,
+          "description": "Redraw throttle in milliseconds for waveform rendering."
+        },
+        "ros2TopicViewer.topicParticipants.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether to resolve publisher/subscriber node names for each topic (runs `ros2 topic info -v` per topic). Disable this if refresh becomes slow."
+        },
+        "ros2TopicViewer.topicParticipants.maxTopics": {
+          "type": "number",
+          "default": 50,
+          "minimum": 0,
+          "description": "Maximum number of topics to resolve pub/sub participants for. 0 means no limit. Topics beyond this limit will show type only."
+        },
+        "ros2TopicViewer.topicParticipants.timeoutMs": {
+          "type": "number",
+          "default": 4000,
+          "minimum": 500,
+          "description": "Timeout in milliseconds for each `ros2 topic info -v` call when resolving topic participants."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "node ./node_modules/typescript/bin/tsc -p .",
+    "watch": "node ./node_modules/typescript/bin/tsc -watch -p .",
+    "vscode:prepublish": "npm run compile"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.30",
+    "@types/vscode": "^1.90.0",
+    "typescript": "^5.5.4"
+  }
+}

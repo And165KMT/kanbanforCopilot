@@ -1,0 +1,446 @@
+{
+  "version": 1,
+  "columns": [
+    "Backlog",
+    "To Do",
+    "In Progress",
+    "Review",
+    "Done"
+  ],
+  "tasks": [
+    {
+      "id": "54d482e3",
+      "title": "VS Code拡張の雛形作成",
+      "goal": "拡張の基本構成（package.json/tsconfig/src）を生成し、起動できる状態にする",
+      "acceptanceCriteria": [
+        "拡張ホストで起動できる",
+        "コマンド1つが登録され実行できる"
+      ],
+      "notes": "Windows環境。TypeScript想定。",
+      "status": "Backlog",
+      "priority": 1,
+      "difficulty": 1,
+      "branchType": "chore",
+      "order": 0,
+      "updatedAt": "2025-12-17T02:57:47.667Z",
+      "createdAt": "2025-12-17T01:42:39.323Z"
+    },
+    {
+      "id": "754d59da",
+      "title": "設定/コマンド/menusの整備",
+      "goal": "package.jsonのcontributes（views/commands/menus/configuration）を整備する",
+      "acceptanceCriteria": [
+        "右クリックメニューが要件通りに出る",
+        "設定がSettings UIに表示される",
+        "ショートカットやコマンド名が一貫する"
+      ],
+      "notes": "コマンドIDの命名統一。",
+      "status": "Backlog",
+      "priority": 2,
+      "difficulty": 2,
+      "branchType": "feature",
+      "order": 1,
+      "updatedAt": "2025-12-17T01:43:52.770Z",
+      "createdAt": "2025-12-17T01:43:52.770Z"
+    },
+    {
+      "id": "331ac126",
+      "title": "ドキュメント整備（使い方/設定）",
+      "goal": "READMEに導入手順・設定・既知の制約を記載する",
+      "acceptanceCriteria": [
+        "READMEに実行方法が載っている",
+        "fieldPath例が載っている",
+        "停止方法・制約（フォーマット依存等）が明記されている"
+      ],
+      "notes": "MVPはWindowsネイティブ前提。",
+      "status": "Backlog",
+      "priority": 3,
+      "difficulty": 1,
+      "branchType": "chore",
+      "order": 2,
+      "updatedAt": "2025-12-17T01:43:59.412Z",
+      "createdAt": "2025-12-17T01:43:59.412Z"
+    },
+    {
+      "id": "a260bdcd",
+      "title": "echo配列の展開（数値配列の分解とプロット）",
+      "goal": "`ros2 topic echo` から数値配列（例: float32[]）を抽出し、指定インデックスや全要素を分解してプロットできるようにする",
+      "acceptanceCriteria": [
+        "数値配列をパースして要素ごとに値を取得できる（例: data[0], data[1] ...）",
+        "設定で `fieldPath` に加え配列指定（例: `ranges[*]` または `ranges[10]`）が使える",
+        "プロットは最低限「単一系列」または「複数系列（上限あり）」で描画できる",
+        "抽出できない/配列が大きすぎる場合はテキスト表示にフォールバックし、落ちない"
+      ],
+      "notes": "MVP: `[*]` は先頭N要素に制限、または選択インデックスのみ。大量配列は間引き必須。",
+      "status": "Backlog",
+      "priority": 2,
+      "difficulty": 3,
+      "branchType": "feature",
+      "order": 3,
+      "updatedAt": "2025-12-17T06:50:01.142Z",
+      "createdAt": "2025-12-17T06:50:01.142Z"
+    },
+    {
+      "id": "4f027570",
+      "title": "3次元空間へのLiDARデータプロット",
+      "goal": "LaserScan/PointCloud2 等のLiDAR系メッセージを3D空間にプロットし、簡易的に点群を可視化できるようにする",
+      "acceptanceCriteria": [
+        "`sensor_msgs/msg/LaserScan` を購読して 2D→3D（XY平面）点として描画できる",
+        "可能なら `sensor_msgs/msg/PointCloud2` の点群を描画できる（最初はXYZのみ）",
+        "描画はWebview内で破綻せず、点数が多い場合は間引き/上限で耐える",
+        "停止/切替ができ、パネルを閉じたら購読を止める"
+      ],
+      "notes": "最初はCanvas 2D投影または軽量WebGL(three.js無しの最小)を検討。ただし依存追加は慎重に。",
+      "status": "Backlog",
+      "priority": 2,
+      "difficulty": 4,
+      "branchType": "feature",
+      "order": 4,
+      "updatedAt": "2025-12-17T06:50:02.327Z",
+      "createdAt": "2025-12-17T06:50:02.327Z"
+    },
+    {
+      "id": "13f2cffd",
+      "title": "RVizのようなデータ統合（複数トピック重畳/座標系）",
+      "goal": "複数トピック（TF、センサ、軌跡など）を同一ビューで統合表示し、RViz的に重畳できる最小基盤を作る",
+      "acceptanceCriteria": [
+        "複数トピックを同時に選択して同一ビューへ重ねて描画できる（例: trajectory + lidar）",
+        "`tf2_msgs/msg/TFMessage`（または `/tf` `/tf_static`）を取り込み、固定フレーム基準で座標変換できる（最小対応）",
+        "表示のON/OFFが独立して操作できる（相互干渉しない）",
+        "負荷が高い場合でも落ちず、必要な間引き/上限がある"
+      ],
+      "notes": "この段階で設計（データモデル/レンダラ/座標系）を分離して拡張しやすくする。",
+      "status": "Backlog",
+      "priority": 3,
+      "difficulty": 5,
+      "branchType": "feature",
+      "order": 5,
+      "updatedAt": "2025-12-17T06:50:03.303Z",
+      "createdAt": "2025-12-17T06:50:03.303Z"
+    },
+    {
+      "id": "d9026b0b",
+      "title": "ストリーム出力の文字コード統一（outputEncoding適用）",
+      "goal": "echo/hz/bw など spawn ベースのストリーム出力でも `ros2TopicViewer.outputEncoding` を適用し、UTF-8/CP932/auto を一貫して正しく表示する",
+      "acceptanceCriteria": [
+        "Topic Panel と Output の両方で文字化けしない（Windows cp932 / Docker UTF-8）",
+        "`runRos2` と `spawnRos2` 経由の出力デコードが同じロジックになる",
+        "hz/bw の生出力も同様に設定が効く"
+      ],
+      "notes": "現状は extension.ts 側で Buffer.toString('utf8') を使っている箇所があるので置換が必要。",
+      "status": "Backlog",
+      "priority": 1,
+      "difficulty": 2,
+      "branchType": "fix",
+      "order": 6,
+      "updatedAt": "2025-12-17T06:53:19.254Z",
+      "createdAt": "2025-12-17T06:53:19.254Z"
+    },
+    {
+      "id": "b68a6cf8",
+      "title": "Topic Infoの表示先をパネルへ統一（生出力表示）",
+      "goal": "`ros2 topic info -v` の結果を Topic Panel にも表示できるようにし、情報確認をVS Code内で完結させる",
+      "acceptanceCriteria": [
+        "`Show Topic Info` 実行で Topic Panel のログ領域に生出力が追記される",
+        "失敗時は panel status とログにエラーが出る",
+        "パネル未表示でも自動で開いて表示できる"
+      ],
+      "notes": "現在は OutputChannel に出ているため、hz/bw と同じ UX に寄せる。",
+      "status": "Backlog",
+      "priority": 2,
+      "difficulty": 2,
+      "branchType": "feature",
+      "order": 7,
+      "updatedAt": "2025-12-17T06:53:20.624Z",
+      "createdAt": "2025-12-17T06:53:20.624Z"
+    },
+    {
+      "id": "2a99b872",
+      "title": "Topic Panelログの上限・クリア機能",
+      "goal": "Topic Panel のテキストログが無制限に増えて重くならないように、上限とクリア操作を提供する",
+      "acceptanceCriteria": [
+        "ログの最大文字数/行数を超えたら古い分を捨てる",
+        "`Clear Log` 操作（ボタン or コマンド）でログを消せる",
+        "長時間echoしてもパネルが重くなりにくい"
+      ],
+      "notes": "波形リングバッファ同様にログもリング化。",
+      "status": "Backlog",
+      "priority": 3,
+      "difficulty": 2,
+      "branchType": "feature",
+      "order": 8,
+      "updatedAt": "2025-12-17T06:53:22.345Z",
+      "createdAt": "2025-12-17T06:53:22.345Z"
+    },
+    {
+      "id": "3d5e4965",
+      "title": "Topicsの自動更新（任意のポーリング）",
+      "goal": "トピック増減を追いやすいよう、任意で自動更新（一定間隔Refresh）できるようにする",
+      "acceptanceCriteria": [
+        "設定で自動更新ON/OFFと間隔（秒）を変更できる",
+        "手動Refreshと共存し、停止/無効化で完全に止まる",
+        "更新中にecho中でも落ちない"
+      ],
+      "notes": "MVP外だったが運用で欲しくなる可能性が高いので後追いで追加。",
+      "status": "Backlog",
+      "priority": 3,
+      "difficulty": 3,
+      "branchType": "feature",
+      "order": 9,
+      "updatedAt": "2025-12-17T06:53:23.203Z",
+      "createdAt": "2025-12-17T06:53:23.203Z"
+    },
+    {
+      "id": "479ae6a0",
+      "title": "Topic Actionsメニューの日本語化・項目整理",
+      "goal": "「…」メニュー(QuickPick)の表示文言を日本語/一貫した表現にし、よく使う順に整理する",
+      "acceptanceCriteria": [
+        "QuickPickのラベルが日本語で分かりやすい",
+        "同義の表現（Show/Echoなど）が揃う",
+        "不要な説明文や冗長な文言が整理される"
+      ],
+      "notes": "UIの小さな磨き込み。",
+      "status": "Backlog",
+      "priority": 4,
+      "difficulty": 1,
+      "branchType": "chore",
+      "order": 10,
+      "updatedAt": "2025-12-17T06:53:24.711Z",
+      "createdAt": "2025-12-17T06:53:24.711Z"
+    },
+    {
+      "id": "177820db",
+      "title": "Diagnosticsの改善（原因別ガイダンス/設定導線）",
+      "goal": "`ROS2: Diagnostics` の出力を原因別に分かりやすくし、設定（commandTemplate/dockerContainer等）への導線を用意する",
+      "acceptanceCriteria": [
+        "ros2未検出/権限/コンテナ未選択など、代表的原因が判別しやすい",
+        "必要な設定キー名と例がOutputに出る",
+        "可能なら `Open Settings` の導線（コマンド）を追加する"
+      ],
+      "notes": "現場での導入・トラブル対応を楽にする。",
+      "status": "Backlog",
+      "priority": 4,
+      "difficulty": 2,
+      "branchType": "chore",
+      "order": 11,
+      "updatedAt": "2025-12-17T06:53:26.501Z",
+      "createdAt": "2025-12-17T06:53:26.501Z"
+    },
+    {
+      "id": "acec87f8",
+      "title": "pub/sub表示の省略ルール（長文対策）",
+      "goal": "Topics一覧の description が長くなりすぎないよう、先頭N件+…の省略ルールを導入する",
+      "acceptanceCriteria": [
+        "ノード数が多いトピックでも一覧表示が崩れない",
+        "省略時も tooltip には全件（またはより多く）が見える",
+        "N（表示上限）は定数または設定で調整可能"
+      ],
+      "notes": "TreeView幅が狭い環境向け。",
+      "status": "Backlog",
+      "priority": 4,
+      "difficulty": 2,
+      "branchType": "chore",
+      "order": 12,
+      "updatedAt": "2025-12-17T06:53:28.585Z",
+      "createdAt": "2025-12-17T06:53:28.585Z"
+    },
+    {
+      "id": "26dfc666",
+      "title": "Topic Info表示コマンド実装",
+      "goal": "選択トピックの `ros2 topic info -v` を実行し結果を表示する",
+      "acceptanceCriteria": [
+        "`Show Topic Info` で情報が表示される",
+        "失敗時にエラーが通知される"
+      ],
+      "notes": "表示先はまずWebviewパネル内テキスト領域。",
+      "status": "Review",
+      "priority": 2,
+      "difficulty": 1,
+      "branchType": "feature",
+      "order": 13,
+      "updatedAt": "2025-12-17T03:25:09.467Z",
+      "createdAt": "2025-12-17T01:43:00.692Z"
+    },
+    {
+      "id": "8f402682",
+      "title": "Topicsツリービュー実装",
+      "goal": "Activity Barに「ROS 2 Topics」ビューを追加し一覧/型表示/更新を実装する",
+      "acceptanceCriteria": [
+        "`Refresh Topics`でトピックがツリー表示される",
+        "各アイテムに topic名と型が表示される",
+        "右クリックに Echo/Info/Copy が出る"
+      ],
+      "notes": "取得は `ros2 topic list -t`。型のパースを実装。",
+      "status": "Done",
+      "priority": 1,
+      "difficulty": 2,
+      "branchType": "feature",
+      "order": 14,
+      "updatedAt": "2025-12-17T03:25:02.068Z",
+      "createdAt": "2025-12-17T01:42:55.689Z"
+    },
+    {
+      "id": "11b7d417",
+      "title": "WSL2移行: npm compile修正",
+      "goal": "WSL2/UNCパス環境でも `npm: compile` が失敗せずにTypeScriptビルドできるようにする",
+      "acceptanceCriteria": [
+        ".vscode/tasks.json がWSL/Windows両対応になっている",
+        "`npm: compile` がWSL環境で成功する",
+        "UNCパス起因の tsconfig 未検出が解消される"
+      ],
+      "notes": "変更: .vscode/tasks.json をwindowsでは wsl.exe 経由に。package.json scripts を node ./node_modules/typescript/bin/tsc に変更して .bin/tsc 実行権限問題を回避。",
+      "status": "Done",
+      "priority": 1,
+      "difficulty": 1,
+      "branchType": "chore",
+      "order": 15,
+      "updatedAt": "2025-12-17T03:05:54.752Z",
+      "createdAt": "2025-12-17T03:05:54.752Z"
+    },
+    {
+      "id": "722860c0",
+      "title": "Echoストリーム購読と停止",
+      "goal": "`ros2 topic echo` をストリーム購読し、停止/再開できるようにする",
+      "acceptanceCriteria": [
+        "`Echo Topic` 実行でechoプロセスが開始し、出力が取り込める",
+        "`Stop Echo` で確実に停止する",
+        "同時に複数echoを開始しない（開始時に前回を停止 or ブロック）"
+      ],
+      "notes": "Webviewへメッセージ行を中継。stderrもログ表示。",
+      "status": "Done",
+      "priority": 1,
+      "difficulty": 3,
+      "branchType": "feature",
+      "order": 16,
+      "updatedAt": "2025-12-17T04:22:36.269Z",
+      "createdAt": "2025-12-17T01:43:12.356Z"
+    },
+    {
+      "id": "9af36b12",
+      "title": "ROS2 CLI実行ラッパ実装",
+      "goal": "`ros2` CLI を安定して実行しstdout/stderr/終了コードを扱える共通層を作る",
+      "acceptanceCriteria": [
+        "`ros2 topic list -t` を実行し結果を取得できる",
+        "設定 `ros2TopicViewer.ros2Command` と `env` を反映できる",
+        "長時間プロセス（echo/hz/bw）を停止できる"
+      ],
+      "notes": "PowerShell上で動作。spawn/execの使い分け、プロセスkillを明確化。",
+      "status": "Done",
+      "priority": 1,
+      "difficulty": 2,
+      "branchType": "feature",
+      "order": 17,
+      "updatedAt": "2025-12-17T04:24:53.621Z",
+      "createdAt": "2025-12-17T01:42:48.589Z"
+    },
+    {
+      "id": "34842d3a",
+      "title": "Webviewパネル基盤実装",
+      "goal": "専用パネルを開き、拡張→Webviewへデータ送信できる土台を作る",
+      "acceptanceCriteria": [
+        "`Open Topic Panel` でWebviewが開く",
+        "拡張側からメッセージを送るとWebview側で受信できる",
+        "再読み込み/再オープンで落ちない"
+      ],
+      "notes": "パネル内は「波形エリア」「テキストログエリア」「ステータス(hz/bw/info)」の最小レイアウト。",
+      "status": "Done",
+      "priority": 1,
+      "difficulty": 3,
+      "branchType": "feature",
+      "order": 18,
+      "updatedAt": "2025-12-17T05:24:52.718Z",
+      "createdAt": "2025-12-17T01:43:07.269Z"
+    },
+    {
+      "id": "4d7053e4",
+      "title": "波形描画（リングバッファ+間引き）",
+      "goal": "Webviewで時系列波形を描画し、maxPointsとthrottleMsを反映する",
+      "acceptanceCriteria": [
+        "折れ線がリアルタイム更新される",
+        "`maxPoints` 超過で古い点が捨てられる",
+        "`throttleMs` で描画頻度が制御される"
+      ],
+      "notes": "まずは軽量実装（Canvas/SVG）で1系列。ズーム/パンは非MVP。",
+      "status": "Done",
+      "priority": 1,
+      "difficulty": 3,
+      "branchType": "feature",
+      "order": 19,
+      "updatedAt": "2025-12-17T05:53:11.099Z",
+      "createdAt": "2025-12-17T01:43:25.376Z"
+    },
+    {
+      "id": "cd709517",
+      "title": "echo出力のパース（fieldPath対応）",
+      "goal": "`ros2 topic echo` テキストから、設定 `waveform.fieldPath` の値とヘッダ時刻を抽出する",
+      "acceptanceCriteria": [
+        "fieldPath（例: `twist.linear.x`）から数値を抽出できる",
+        "Header時刻がある場合はX軸時刻として使える",
+        "抽出できない場合は波形を無効化しテキスト表示にフォールバックする"
+      ],
+      "notes": "ros2 echoのデフォルト表示はYAML風。安全に抽出するため、必要なら `--yaml`/`--no-arr` 等オプション検討（対応可否は環境差あり）。MVPは代表的フォーマットに対応。",
+      "status": "Done",
+      "priority": 1,
+      "difficulty": 4,
+      "branchType": "feature",
+      "order": 20,
+      "updatedAt": "2025-12-17T05:58:58.950Z",
+      "createdAt": "2025-12-17T01:43:20.204Z"
+    },
+    {
+      "id": "552c1896",
+      "title": "バグ: TreeView→パネルのチェック同期が反映されない",
+      "goal": "左のROS 2 TOPICS（TreeView）でチェックON/OFFしたとき、Topic Panel内のチェック状態（setEchoActive）が常に追従するようにする",
+      "acceptanceCriteria": [
+        "パネルを開いた状態でTreeViewチェックをONすると、パネル側でも同じトピックがチェックになる",
+        "TreeViewチェックをOFFすると、パネル側でも同じトピックがOFFになる",
+        "複数トピック同時echoでも同期が崩れない",
+        "パネル復元（reload/serializer）後も同期が維持される"
+      ],
+      "notes": "現状はパネル→TreeViewは同期するが、TreeView→パネルが更新されないケースがある。TopicPanel.getCurrent/attachedPanel参照・メッセージ送信タイミング・panel recreate/serializer復元絡みを疑う。必要なら拡張側でパネル更新の送信ログを出し、webview側で受信ログも出して経路を確定する。",
+      "status": "Done",
+      "priority": 1,
+      "difficulty": 2,
+      "branchType": "fix",
+      "order": 21,
+      "updatedAt": "2025-12-17T06:14:54.417Z",
+      "createdAt": "2025-12-17T05:23:32.634Z"
+    },
+    {
+      "id": "d53b76aa",
+      "title": "hz/bwコマンド実装（生出力表示）",
+      "goal": "`ros2 topic hz` / `ros2 topic bw` を実行して結果をパネルに表示する（生出力）",
+      "acceptanceCriteria": [
+        "`Show Topic Hz` で出力が表示される",
+        "`Show Topic Bw` で出力が表示される",
+        "実行中/失敗時の状態がわかる"
+      ],
+      "notes": "まずはワンショット実行（一定時間で停止）か、短時間サンプル後に停止する設計にする。",
+      "status": "Done",
+      "priority": 2,
+      "difficulty": 2,
+      "branchType": "feature",
+      "order": 22,
+      "updatedAt": "2025-12-17T06:16:53.907Z",
+      "createdAt": "2025-12-17T01:43:32.382Z"
+    },
+    {
+      "id": "a56b6995",
+      "title": "Topics一覧のpub/sub取得を設定で制御（負荷対策）",
+      "goal": "Topics一覧での pub/sub ノード解決（ros2 topic info -v 多発）を、設定でON/OFF・上限件数・タイムアウトを調整可能にする",
+      "acceptanceCriteria": [
+        "設定 `ros2TopicViewer.topicParticipants.enabled` で取得ON/OFFできる",
+        "設定 `maxTopics` などで取得対象の上限を設定できる（上限超過は type のみ表示）",
+        "大量トピックでもRefreshが固まらず、段階更新が継続する"
+      ],
+      "notes": "必要なら「選択中のトピックだけ取得」モードも追加候補。",
+      "status": "Done",
+      "priority": 2,
+      "difficulty": 3,
+      "branchType": "feature",
+      "order": 23,
+      "updatedAt": "2025-12-17T07:03:51.941Z",
+      "createdAt": "2025-12-17T06:53:21.644Z"
+    }
+  ]
+}

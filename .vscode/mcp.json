@@ -1,0 +1,15 @@
+{
+  "servers": {
+    "kanbanto": {
+      "type": "stdio",
+      "command": "/home/kmshiken/.vscode-server/bin/618725e67565b290ba4da6fe2d29f8fa1d4e3622/node",
+      "args": [
+        "/home/kmshiken/.vscode-server/extensions/hiroyuki-aratame.kanbanforcopilot-0.1.0/mcp/kanbanto-mcp/dist/server.js"
+      ],
+      "env": {
+        "KANBANTO_WORKSPACE": "/home/kmshiken/ros2creater",
+        "KANBANTO_BOARD_PATH": ".kanbanto/tasks.json"
+      }
+    }
+  }
+}

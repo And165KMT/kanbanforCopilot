@@ -1,0 +1,22 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "type": "process",
+      "label": "npm: compile",
+      "command": "npm",
+      "windows": {
+        "command": "wsl.exe",
+        "args": [
+          "-e",
+          "bash",
+          "-lc",
+          "cd \"$(wslpath -u \"${workspaceFolder}\")\" && npm run compile"
+        ]
+      },
+      "args": ["run", "compile"],
+      "problemMatcher": ["$tsc"],
+      "group": "build"
+    }
+  ]
+}
