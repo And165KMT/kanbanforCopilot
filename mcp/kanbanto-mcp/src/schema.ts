@@ -53,7 +53,15 @@ export const UpdateTaskInputSchema = z.object({
 export const MoveTaskInputSchema = z.object({
   id: z.string().min(1),
   status: z.string().min(1),
+  notes: z.string().min(1).optional(),
   index: z.number().int().min(0).optional()
+}).superRefine((value, ctx) => {
+  if (value.status !== 'Done' && value.notes !== undefined) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `notes is only supported when moving to Done.`
+    });
+  }
 });
 
 export const DeleteTaskInputSchema = z.object({
