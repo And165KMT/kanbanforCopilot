@@ -8,7 +8,6 @@ import { join } from 'node:path';
 import { z } from 'zod';
 import {
   AddTaskInputSchema,
-  AzureDevopsImportAssignedToMeInputSchema,
   DeleteTaskInputSchema,
   ListTasksInputSchema,
   MoveTaskInputSchema,
@@ -18,7 +17,6 @@ import {
 } from './schema.js';
 import { BoardStore } from './boardStore.js';
 import dotenv from 'dotenv';
-import { fetchWorkItemsByIds, queryAssignedToMeWorkItemIds } from './azureDevops.js';
 
 const WorkspacePathSchema = z.string().min(1);
 const BoardRelPathSchema = z.string().min(1);
@@ -174,27 +172,6 @@ async function main() {
           name: 'board_normalize',
           description: 'Normalize board consistency (status/priority/order, renumber order, etc.)',
           inputSchema: { type: 'object', properties: {}, additionalProperties: false }
-        },
-        {
-          name: 'azure_devops_import_assigned_to_me',
-          description: 'Import Azure DevOps work items assigned to the PAT owner (@Me) into the board',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              orgUrl: { type: 'string', description: 'Org URL e.g. https://dev.azure.com/YourOrg (defaults to AZDO_ORG_URL)' },
-              project: { type: 'string', description: 'Project name (defaults to AZDO_PROJECT)' },
-              wiql: { type: 'string', description: 'Optional WIQL query override' },
-              workItemTypes: { type: 'array', items: { type: 'string' }, description: 'Optional filter (used only when wiql is not provided)' },
-              top: { type: 'number', description: 'Max work items to import (1..500). Default 200.' },
-              targetStatus: { type: 'string', description: 'Target Kanbanto column (default Backlog or first column)' },
-              prefixWithId: { type: 'boolean', description: 'Prefix title with [ADO#123]. Default true.' },
-              skipExisting: { type: 'boolean', description: 'Skip if already imported. Default true.' },
-              includeDone: { type: 'boolean', description: 'Include completed items (Done/Closed etc.). Default false.' },
-              excludeStates: { type: 'array', items: { type: 'string' }, description: 'Optional explicit Azure State names to exclude (used only when wiql is not provided). Example: ["Done","Closed"]' },
-              stateToStatus: { type: 'object', additionalProperties: { type: 'string' }, description: 'Optional mapping: Azure State -> Kanbanto status' }
-            },
-            additionalProperties: false
-          }
         }
       ]
     };
@@ -286,87 +263,6 @@ async function main() {
         const next = store.updateColumns(normalized, input.columns);
         await store.save(next);
         return toolResultJson(next);
-      }
-
-      case 'azure_devops_import_assigned_to_me': {
-        const input = AzureDevopsImportAssignedToMeInputSchema.parse(args);
-
-        const orgUrl = (input.orgUrl ?? process.env.AZDO_ORG_URL ?? '').trim();
-        const project = (input.project ?? process.env.AZDO_PROJECT ?? '').trim();
-        const pat = (process.env.AZDO_PAT ?? '').trim();
-        if (!orgUrl) return toolResultText('orgUrl is required (set AZDO_ORG_URL in .env or pass orgUrl)');
-        if (!project) return toolResultText('project is required (set AZDO_PROJECT in .env or pass project)');
-        if (!pat) return toolResultText('PAT is required (set AZDO_PAT in .env)');
-
-        const includeDone = input.includeDone ?? false;
-        const defaultExcluded = ['Done', 'Closed'];
-        const excludeStates = includeDone ? [] : ((input.excludeStates && input.excludeStates.length > 0) ? input.excludeStates : defaultExcluded);
-
-        const ids = await queryAssignedToMeWorkItemIds({
-          orgUrl,
-          project,
-          pat,
-          wiql: input.wiql,
-          workItemTypes: input.workItemTypes,
-          excludeStates: input.wiql ? undefined : excludeStates,
-          top: input.top
-        });
-
-        const items = await fetchWorkItemsByIds({ orgUrl, project, pat, ids });
-        const normalized = store.normalize(board);
-
-        const targetFallback = (input.targetStatus && normalized.columns.includes(input.targetStatus))
-          ? input.targetStatus
-          : (normalized.columns.includes('Backlog') ? 'Backlog' : normalized.columns[0]);
-
-        let nextBoard = normalized;
-        let imported = 0;
-        let skippedExisting = 0;
-        let skippedByState = 0;
-
-        const excludeSet = new Set(excludeStates.map((s) => s.toLowerCase()));
-
-        for (const wi of items) {
-          const marker = `ADO#${wi.id}`;
-          const already = nextBoard.tasks.some((t) => (t.notes ?? '').includes(marker));
-          if (input.skipExisting && already) {
-            skippedExisting++;
-            continue;
-          }
-
-          if (!includeDone && wi.state && excludeSet.has(wi.state.toLowerCase())) {
-            skippedByState++;
-            continue;
-          }
-
-          const mappedStatusRaw = (wi.state && input.stateToStatus) ? input.stateToStatus[wi.state] : undefined;
-          const mappedStatus = (mappedStatusRaw && nextBoard.columns.includes(mappedStatusRaw)) ? mappedStatusRaw : undefined;
-          const status = mappedStatus ?? targetFallback;
-
-          const title = input.prefixWithId ? `[ADO#${wi.id}] ${wi.title}` : wi.title;
-          const notesLines = [
-            marker,
-            `URL: ${wi.url}`,
-            wi.type ? `Type: ${wi.type}` : undefined,
-            wi.state ? `State: ${wi.state}` : undefined
-          ].filter((s): s is string => typeof s === 'string' && s.length > 0);
-
-          const { board: afterAdd } = store.addTask(nextBoard, {
-            title,
-            status,
-            priority: 0,
-            goal: wi.description,
-            acceptanceCriteria: wi.acceptanceCriteria,
-            notes: notesLines.join('\n')
-          });
-
-          nextBoard = afterAdd;
-          imported++;
-        }
-
-        await store.save(nextBoard);
-        const skipped = skippedExisting + skippedByState;
-        return toolResultJson({ imported, skipped, skippedExisting, skippedByState, totalFetched: items.length, board: nextBoard });
       }
 
       case 'board_normalize': {

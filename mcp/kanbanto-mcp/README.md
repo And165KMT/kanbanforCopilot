@@ -1,10 +1,10 @@
 # kanbanto-mcp
 
-An MCP (Model Context Protocol) server (stdio) for Kanban to Copilot.
+An MCP (Model Context Protocol) server (stdio) for Kanban for Copilot.
 
 ## Tools
 - Get board: `board_get`
-- List tasks: `tasks_list`
+- List task titles: `tasks_list`
 - Add task: `task_add`
 - Update task: `task_update`
 - Move task: `task_move`
@@ -12,6 +12,12 @@ An MCP (Model Context Protocol) server (stdio) for Kanban to Copilot.
 - Apply in-column reorder: `column_reorder`
 - Update columns: `columns_update`
 - Normalize board: `board_normalize`
+
+## Behavior notes
+- Mutation tools return compact JSON (changed entities/inputs), not the full board. Use `board_get` if you need the full state.
+- `tasks_list` returns an array of titles (strings).
+- When moving a task to `Done`, `task_move` requires `notes` (work performed) and appends it to the task's existing notes.
+- `board_get` returns a compact board by default; pass `{ "full": true }` if you need the full JSON.
 
 ## Target file
 By default, this server reads/writes `.kanbanto/tasks.json` under the workspace folder.

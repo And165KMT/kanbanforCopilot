@@ -11,9 +11,6 @@ let board = null;
 let editingTaskId = null;
 
 /** @type {string} */
-let adoCommentDraft = '';
-
-/** @type {string} */
 let searchQuery = '';
 
 /** @type {string} */
@@ -93,8 +90,6 @@ function render() {
     el('div', { class: 'topbar__searchWrap' }, [search, clearSearch]),
     el('div', { class: 'topbar__actions' }, [
       button('Columns', () => vscode.postMessage({ type: 'editColumns' })),
-      button('Settings', () => vscode.postMessage({ type: 'openEnvSettings' })),
-      button('Azureから取り込み', () => vscode.postMessage({ type: 'importAzure' })),
       button('+ New', () => openCreateModal(), 'primary')
     ])
   ]);
@@ -223,8 +218,6 @@ function taskCard(task) {
   meta.appendChild(el('span', { class: `kv kv--priority ${priorityTone(p)}`, text: `P${p}` }));
   if (task.difficulty) meta.appendChild(el('span', { class: 'kv kv--difficulty', text: `D${task.difficulty}` }));
   if (task.branchType) meta.appendChild(el('span', { class: 'kv kv--branch', text: task.branchType }));
-  const adoId = extractAdoWorkItemId(task);
-  if (adoId) meta.appendChild(el('span', { class: 'kv kv--ado', text: `ADO#${adoId}` }));
   node.appendChild(meta);
 
   // Delete affordance (avoid interfering with card click -> modal)
@@ -339,12 +332,10 @@ function taskModal(task) {
   const notes = textArea('Notes', task.notes ?? '', (v) => (task.notes = v), {
     rows: 7,
     grow: true,
-    placeholder: 'Links, context, and notes (e.g. ADO#12345)'
+    placeholder: 'Links, context, and notes'
   });
 
   const noteLinks = urlLinksFromNotes(task.notes ?? '');
-
-  const ado = adoCommentSection(task);
 
   const status = dropdown('Status', board.columns, task.status, (v) => (task.status = v));
   const branch = dropdown('Branch type', ['feature', 'fix', 'chore'], task.branchType ?? 'feature', (v) => (task.branchType = v));
@@ -352,7 +343,7 @@ function taskModal(task) {
   const difficulty = stars('Difficulty', task.difficulty ?? 0, (v) => (task.difficulty = v));
 
   // Layout: task inputs on top (full width), settings compact below
-  const taskPanel = el('div', { class: 'panel panel--task' }, [title, goal, ac, notes, noteLinks, ado]);
+  const taskPanel = el('div', { class: 'panel panel--task' }, [title, goal, ac, notes, noteLinks]);
   // Order: Difficulty+Priority (same row) / Branch type+Status (same row)
   const settingsGrid = el('div', { class: 'settings-grid' }, [difficulty, priority, branch, status]);
   const settingsPanel = el('div', { class: 'panel panel--settings' }, [
@@ -390,106 +381,6 @@ function taskModal(task) {
   );
   backdrop.appendChild(modal);
   return backdrop;
-}
-
-function extractAdoWorkItemId(task) {
-  const text = String(task?.notes ?? '');
-  const m = text.match(/\bADO#(\d+)\b/);
-  if (!m) return null;
-  const id = Number(m[1]);
-  return Number.isFinite(id) && id > 0 ? id : null;
-}
-
-function adoCommentSection(task) {
-  const id = extractAdoWorkItemId(task);
-  if (!id) return el('div');
-
-  const area = textArea('ADO comment', adoCommentDraft, (v) => (adoCommentDraft = v), {
-    rows: 3,
-    placeholder: 'Write a comment (paste an image to attach)'
-  });
-  const input = area.querySelector('vscode-text-area');
-  if (input) {
-    input.addEventListener('paste', async (e) => {
-      const items = Array.from(e.clipboardData?.items ?? []);
-      const img = items.find((it) => it.kind === 'file' && String(it.type).startsWith('image/'));
-      if (!img) return;
-
-      const file = img.getAsFile();
-      if (!file) return;
-
-      // Prevent default paste (image cannot be inserted into the text area anyway)
-      e.preventDefault();
-
-      // Guard: avoid sending huge payload over postMessage
-      const maxBytes = 2 * 1024 * 1024; // 2MB
-      if (file.size > maxBytes) {
-        // Use file picker for large images
-        return;
-      }
-
-      const base64 = await fileToBase64(file);
-      vscode.postMessage({
-        type: 'addAdoAttachment',
-        workItemId: id,
-        fileName: `pasted-${new Date().toISOString().replace(/[:.]/g, '-')}.png`,
-        mime: file.type || 'image/png',
-        dataBase64: base64,
-        comment: String(adoCommentDraft ?? '').trim() || undefined
-      });
-    });
-  }
-  const post = el('vscode-button', {
-    appearance: 'secondary',
-    text: 'Post',
-    title: `Post comment to ADO#${id}`,
-    onclick: () => {
-      const comment = String(adoCommentDraft ?? '').trim();
-      if (!comment) return;
-      vscode.postMessage({ type: 'addAdoComment', workItemId: id, comment });
-      adoCommentDraft = '';
-      render();
-    }
-  });
-
-  const postWithAttach = el('vscode-button', {
-    appearance: 'icon',
-    title: 'Attach file…',
-    'aria-label': 'Attach file',
-    onclick: () => {
-      const comment = String(adoCommentDraft ?? '').trim();
-      vscode.postMessage({ type: 'addAdoCommentWithAttachment', workItemId: id, comment: comment || '' });
-      render();
-    }
-  }, [el('span', { text: '+' })]);
-
-  const updateDesc = el('vscode-button', {
-    appearance: 'secondary',
-    text: 'Update Description',
-    title: `Update ADO#${id} Description from Goal/Acceptance Criteria`,
-    onclick: () => {
-      vscode.postMessage({
-        type: 'syncAdoDescription',
-        workItemId: id,
-        goal: String(task.goal ?? ''),
-        acceptanceCriteria: Array.isArray(task.acceptanceCriteria) ? task.acceptanceCriteria : []
-      });
-    }
-  });
-
-  return el('div', { class: 'field' }, [el('label', { text: 'Azure DevOps' }), area, el('div', { class: 'row' }, [post, postWithAttach, updateDesc])]);
-}
-
-async function fileToBase64(file) {
-  const buf = await file.arrayBuffer();
-  let binary = '';
-  const bytes = new Uint8Array(buf);
-  // Chunk to avoid call stack limits
-  const chunk = 0x8000;
-  for (let i = 0; i < bytes.length; i += chunk) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
-  }
-  return btoa(binary);
 }
 
 function urlLinksFromNotes(notesText) {

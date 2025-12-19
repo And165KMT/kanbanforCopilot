@@ -356,11 +356,6 @@ body {
   background: color-mix(in srgb, var(--vscode-charts-purple, var(--accent)) 12%, var(--surface-2));
 }
 
-.kv--ado {
-  border-color: color-mix(in srgb, var(--accent) 30%, var(--border-subtle));
-  background: color-mix(in srgb, var(--accent) 10%, var(--surface-2));
-}
-
 .card__actions {
   position: absolute;
   top: 8px;
