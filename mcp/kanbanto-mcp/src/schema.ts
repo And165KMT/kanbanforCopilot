@@ -53,7 +53,15 @@ export const UpdateTaskInputSchema = z.object({
 export const MoveTaskInputSchema = z.object({
   id: z.string().min(1),
   status: z.string().min(1),
+  notes: z.string().min(1).optional(),
   index: z.number().int().min(0).optional()
+}).superRefine((value, ctx) => {
+  if (value.status !== 'Done' && value.notes !== undefined) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `notes is only supported when moving to Done.`
+    });
+  }
 });
 
 export const DeleteTaskInputSchema = z.object({
@@ -74,19 +82,3 @@ export const ListTasksInputSchema = z.object({
   query: z.string().min(1).optional(),
   limit: z.number().int().min(1).max(500).optional()
 });
-
-export const AzureDevopsImportAssignedToMeInputSchema = z
-  .object({
-    orgUrl: z.string().min(1).optional(),
-    project: z.string().min(1).optional(),
-    wiql: z.string().min(1).optional(),
-    workItemTypes: z.array(z.string().min(1)).min(1).optional(),
-    top: z.number().int().min(1).max(500).optional(),
-    targetStatus: z.string().min(1).optional(),
-    prefixWithId: z.boolean().optional().default(true),
-    skipExisting: z.boolean().optional().default(true),
-    includeDone: z.boolean().optional().default(false),
-    excludeStates: z.array(z.string().min(1)).optional(),
-    stateToStatus: z.record(z.string().min(1), z.string().min(1)).optional()
-  })
-  .strict();

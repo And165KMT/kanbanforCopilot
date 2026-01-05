@@ -22,6 +22,9 @@ yarn-error.log*
 .env.*
 !.env.example
 
+# Workspace-local MCP config (contains absolute paths)
+.vscode/mcp.json
+
 # OS
 .DS_Store
 Thumbs.db

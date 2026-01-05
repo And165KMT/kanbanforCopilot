@@ -1,8 +1,18 @@
 .vscode/**
+.git/**
+.gitignore
+tsconfig.json
+package-lock.json
+scripts/**
 **/*.ts
 **/*.map
 mcp/**
 node_modules/**
+.kanbanto/**
+.DS_Store
+Thumbs.db
+*.vsix
+.env.example
 
 # include webview UI toolkit runtime (needed at extension runtime)
 !node_modules/@vscode/webview-ui-toolkit/dist/**
@@ -12,6 +22,27 @@ node_modules/**
 
 # build output
 !dist/**
+
+# bundle MCP server runtime (minimal deps)
+!mcp/kanbanto-mcp/dist/**
+!mcp/kanbanto-mcp/node_modules/@modelcontextprotocol/sdk/package.json
+!mcp/kanbanto-mcp/node_modules/@modelcontextprotocol/sdk/dist/esm/**
+!mcp/kanbanto-mcp/node_modules/ajv/**
+!mcp/kanbanto-mcp/node_modules/ajv-formats/**
+!mcp/kanbanto-mcp/node_modules/fast-deep-equal/**
+!mcp/kanbanto-mcp/node_modules/fast-uri/**
+!mcp/kanbanto-mcp/node_modules/json-schema-traverse/**
+!mcp/kanbanto-mcp/node_modules/require-from-string/**
+!mcp/kanbanto-mcp/node_modules/zod/**
+!mcp/kanbanto-mcp/node_modules/zod-to-json-schema/package.json
+!mcp/kanbanto-mcp/node_modules/zod-to-json-schema/dist/esm/**
+!mcp/kanbanto-mcp/node_modules/dotenv/**
+
+# re-exclude non-runtime artifacts even under included paths
+**/*.map
+**/*.d.ts
+**/*.d.cts
+**/*.d.mts
 .env
 .env.*
 *.env

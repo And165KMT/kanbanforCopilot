@@ -1,14 +1,31 @@
-# Kanban to Copilot
+# Kanban for Copilot
 
 A lightweight Kanban board for VS Code with JSON persistence, plus one-click “Copy as Markdown” so you can paste a task into Copilot/Chat.
+
+## License / 利用条件
+Non-commercial use only. Commercial use is prohibited. See [LICENSE](LICENSE).
+（商用利用は禁止です）
+
+## Disclaimer
+This is an unofficial project and is not affiliated with Microsoft.
 
 ## Features
 - Drag & drop tasks across columns and within a column
 - Store board data in a JSON file inside your workspace
 - Edit columns (add / rename / reorder)
 - Task fields: title, goal, acceptance criteria, notes, status, priority, difficulty, branch type
+- One-click “Copy Markdown” per task (clipboard)
 - Search (press Enter to apply; Esc to clear)
 - External edits win: if the JSON file changes, the webview reloads from disk
+
+## Usage
+- Open from the Activity Bar: **Task board**
+- Or run commands from the Command Palette:
+  - `Kanban: Open Task board`
+  - `Kanban: Open Task board (Floating)`
+- Copy a task as Markdown: click **Copy Markdown** on the task
+
+Note: Settings and data files use the internal id `kanbanto` (e.g. `.kanbanto/tasks.json`, `kanbanto.*`).
 
 ## Data file
 By default the board is stored at `.kanbanto/tasks.json` under your workspace folder.
@@ -49,32 +66,23 @@ Notes:
 This repo includes an MCP (Model Context Protocol) server so tools can directly read/write the same board file.
 
 - Project: [mcp/kanbanto-mcp](mcp/kanbanto-mcp)
-- Tools: `board_get`, `tasks_list`, `task_add`, `task_update`, `task_move`, `task_delete`, `column_reorder`, `columns_update`, `board_normalize`, `azure_devops_import_assigned_to_me`
-
-### Azure DevOps import (PAT)
-
-The MCP server can import Azure DevOps work items assigned to the PAT owner (`@Me`) and add them as Kanbanto tasks.
-
-1) Create a `.env` file in the workspace folder (this repo ignores it via `.gitignore`)
-Use the template [.env.example](.env.example).
-
-Required variables:
-- `AZDO_ORG_URL` e.g. `https://dev.azure.com/YourOrg`
-- `AZDO_PROJECT` e.g. `YourProject`
-- `AZDO_PAT` a PAT with at least **Work Items (read)**
-
-Notes:
-- The examples above are placeholders. Do not commit real org/project names or any PATs to Git.
-
-2) Call the MCP tool
-- Tool: `azure_devops_import_assigned_to_me`
-- Defaults read from `.env`.
-- Imported tasks include an `ADO#12345` marker in `notes` so re-import can skip duplicates.
+- Tools: `board_get`, `tasks_list`, `task_add`, `task_update`, `task_move`, `task_delete`, `column_reorder`, `columns_update`, `board_normalize`
 
 ### Configure MCP (so Copilot can manage tasks)
 
-Important: installing the VSIX only installs the VS Code extension. The MCP server is a separate Node.js process, so you must provide it and register it.
+Prereqs: VS Code + Copilot Chat with MCP support (uses `.vscode/mcp.json`).
 
+Important: the MCP server runs as a separate process. This extension can generate the needed `.vscode/mcp.json` for you, or you can register a server manually.
+
+#### Option A (recommended): one-command setup from the extension
+1) Install the extension (VSIX / Marketplace).
+2) Open the workspace you want Copilot to operate on.
+3) Run the command: `Kanban: Enable Copilot MCP Tools`
+
+This will create/update `.vscode/mcp.json` for the current workspace. The MCP server executable is bundled with the extension; you do not need to copy the `mcp/` folder into your workspace. If Node.js cannot be found, install Node.js or set `kanbanto.nodePath`.
+Note: the generated config uses absolute paths; if you move the workspace to another machine, run the command again.
+
+#### Option B: manual setup (advanced / custom location)
 1) Get the MCP server code
 - Either clone this repo, or copy the folder [mcp/kanbanto-mcp](mcp/kanbanto-mcp) into the workspace where you want to use the board.
 
@@ -107,6 +115,7 @@ Example:
 
 Notes:
 - If you placed the MCP server somewhere else, change `args` to the correct `dist/server.js` path.
+- If `command: "node"` fails with `spawn node ENOENT`, use an absolute Node path (or run `Kanban: Enable Copilot MCP Tools` to generate a working config automatically).
 - Set `KANBANTO_BOARD_PATH` to match the extension setting `kanbanto.boardFileRelativePath`.
 
 ## Development

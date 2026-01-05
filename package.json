@@ -1,10 +1,10 @@
 {
-  "name": "kanbanto-copilot",
-  "displayName": "Kanban to Copilot",
+  "name": "kanbanforcopilot",
+  "displayName": "Kanban for Copilot",
   "description": "Kanban board + JSON persistence + copy task as Markdown for Copilot.",
-  "version": "0.1.0",
-  "publisher": "local",
-  "license": "MIT",
+  "version": "0.1.1",
+  "publisher": "hiroyuki-aratame",
+  "license": "SEE LICENSE IN LICENSE",
   "repository": {
     "type": "git",
     "url": "https://github.com/And165KMT/kanbanforCopilot.git"
@@ -17,12 +17,6 @@
     "vscode": "^1.90.0"
   },
   "categories": ["Other"],
-  "activationEvents": [
-    "onView:kanbanto.boardView",
-    "onCommand:kanbanto.openBoard",
-    "onCommand:kanbanto.openBoardFloating",
-    "onStartupFinished"
-  ],
   "main": "./dist/extension.js",
   "contributes": {
     "viewsContainers": {
@@ -52,6 +46,10 @@
       {
         "command": "kanbanto.openBoardFloating",
         "title": "Kanban: Open Task board (Floating)"
+      },
+      {
+        "command": "kanbanto.setupMcp",
+        "title": "Kanban: Enable Copilot MCP Tools"
       }
     ],
     "configuration": {
@@ -66,13 +64,24 @@
           "type": "string",
           "default": ".kanbanto/tasks.json",
           "description": "Relative path to the board JSON under workspacePath. Default: .kanbanto/tasks.json"
+        },
+        "kanbanto.nodePath": {
+          "type": "string",
+          "default": "",
+          "description": "Optional absolute path to Node.js used for the MCP server. If empty, Kanbanto tries VS Code's bundled Node, then system Node."
+        },
+        "kanbanto.mcpAutoPrompt": {
+          "type": "boolean",
+          "default": true,
+          "description": "Prompt to configure `.vscode/mcp.json` for Copilot MCP tools when missing or broken."
         }
       }
     }
   },
   "scripts": {
-    "vscode:prepublish": "npm run build",
+    "vscode:prepublish": "npm run build && npm run build:mcp",
     "build": "tsc -p tsconfig.json",
+    "build:mcp": "npm --prefix mcp/kanbanto-mcp run build",
     "watch": "tsc -watch -p tsconfig.json"
   },
   "devDependencies": {
